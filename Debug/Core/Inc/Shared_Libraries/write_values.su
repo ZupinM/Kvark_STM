@@ -1,0 +1,4 @@
+write_values.c:742:6:write_value_limit	16	static
+write_values.c:109:6:write_values	48	static
+write_values.c:98:6:USB_write	16	static
+write_values.c:814:14:decrypt	20	static

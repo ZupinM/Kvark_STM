@@ -1,0 +1,14 @@
+focus.c:41:6:focus_init	0	static
+focus.c:65:6:focus_calc_A	24	static
+focus.c:81:6:focus_calc_B	24	static
+focus.c:97:6:focus_reset	0	static
+focus.c:107:6:focus_restart	0	static
+focus.c:119:6:focus_cancel	0	static
+focus.c:187:5:focus_A_OK	8	static
+focus.c:190:5:focus_B_OK	8	static
+focus.c:194:5:focus_locked	8	static
+focus.c:129:6:focus_process	24	static
+focus.c:208:6:focus_update	0	static
+focus.c:111:6:focus_start	0	static
+focus.c:214:7:focus_angle_A	0	static
+focus.c:215:7:focus_angle_B	0	static

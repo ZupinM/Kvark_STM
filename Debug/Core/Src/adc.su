@@ -1,0 +1,8 @@
+adc.c:35:6:MX_ADC1_Init	32	static
+adc.c:149:6:HAL_ADC_MspInit	48	static
+adc.c:210:6:HAL_ADC_MspDeInit	8	static
+adc.c:266:6:ClearADC_BatteryMeas	8	static
+adc.c:272:6:SetADC_BatteryMeas	32	static
+adc.c:251:6:StartADC_DMA_Sequence	8	static
+adc.c:305:7:GetAnalogValues	80	static
+adc.c:365:9:MotorSelectI	0	static
