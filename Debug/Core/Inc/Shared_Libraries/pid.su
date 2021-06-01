@@ -1,9 +1,0 @@
-pid.c:18:6:pid_init	0	static
-pid.c:32:6:pid_tune	0	static
-pid.c:51:6:get_gains	8	static
-pid.c:66:6:pid_setinteg	0	static
-pid.c:82:6:pid_bumpless	0	static
-pid.c:145:7:pid_calc	20	static
-pid.c:199:7:ramp_init	0	static
-pid.c:210:6:pid_ramp	16	static
-pid.c:232:7:pid_calc_inc	0	static

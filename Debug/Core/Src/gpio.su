@@ -1,3 +1,0 @@
-gpio.c:41:6:MX_GPIO_Init	88	static
-gpio.c:159:6:set_LED	16	static
-gpio.c:203:6:HallVoltage	16	static

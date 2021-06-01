@@ -1,2 +1,0 @@
-usb_device.c:60:6:MX_USB_DEVICE_DeInit	8	static
-usb_device.c:78:6:MX_USB_DEVICE_Init	8	static

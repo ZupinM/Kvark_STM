@@ -1,8 +1,0 @@
-spi.c:24:6:LoRa_Interrupt	0	static,ignoring_inline_asm
-spi.c:36:6:MX_SPI3_Init	8	static
-spi.c:70:6:HAL_SPI_MspInit	64	static
-spi.c:118:6:HAL_SPI_MspDeInit	8	static
-spi.c:150:6:LoRa_SPIWrite	8	dynamic
-spi.c:161:9:LoRa_SPIRead	16	dynamic
-spi.c:170:6:LoRa_reset	0	static
-spi.c:177:6:spi_rx_fifo_clear	0	static
