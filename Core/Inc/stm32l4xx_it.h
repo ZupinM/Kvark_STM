@@ -28,7 +28,6 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "Shared_Libraries/SX1278.h"
 #include "adc.h"
 
 /* USER CODE END Includes */

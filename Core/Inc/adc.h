@@ -29,7 +29,6 @@ extern "C" {
 
 /* USER CODE BEGIN Includes */
 
-#include "../Inc/Shared_Libraries/bldc.h"
 
 /* USER CODE END Includes */
 
@@ -59,10 +58,10 @@ void MX_ADC1_Init(void);
 /* USER CODE BEGIN Prototypes */
 
 void StartADC_DMA_Sequence(void);
-float GetAnalogValues(unsigned char measuring_point);
+
 void SetADC_BatteryMeas(void);
 void ClearADC_BatteryMeas(void);
-uint8_t MotorSelectI(unsigned char motor);
+
 
 /* USER CODE END Prototypes */
 

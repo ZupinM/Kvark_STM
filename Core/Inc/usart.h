@@ -29,7 +29,6 @@ extern "C" {
 
 /* USER CODE BEGIN Includes */
 #include <stdint.h>
-#include "Shared_Libraries/SX1278.h"
 /* USER CODE END Includes */
 
 extern UART_HandleTypeDef huart1;

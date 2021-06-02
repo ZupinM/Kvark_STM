@@ -32,51 +32,19 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "usart.h"
-#include "Shared_Libraries/config.h"
+
 #include <stdint.h>
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
-typedef struct {
-  unsigned short int const sw_version;
-  unsigned short int const blank1;
-  unsigned short int const blank2;
-  unsigned short int const blank3;
-  unsigned short int const blank4;
-  unsigned short int const blank5;
-  unsigned short int const blank6;
-  unsigned short int const blank7;
-  unsigned short int const blank8;
-}Version;
+
 
 /* USER CODE END ET */
 
 /* Exported constants --------------------------------------------------------*/
 /* USER CODE BEGIN EC */
-#define BUFSIZE		255
-extern uint8_t transceiver;
-extern uint8_t transceiver_saved;
-extern uint8_t LoRa_channel_received;
-extern volatile uint8_t transmission;
-extern volatile uint8_t lora_int_stat;
-extern volatile uint8_t LoRa_bindMode;
-extern  uint8_t LoRa_channel_received;
-extern uint8_t LoRa_bindMode_slave;
-extern int baudrate_timeout;
-extern uint8_t checkRouting;
-extern volatile int delay_reset;
-extern unsigned int backup_timeout;
-extern volatile unsigned int bldc_Speed;
-extern unsigned int store_in_flash;
 
-extern volatile uint8_t UARTBuffer0[BUFSIZE];
-extern unsigned char uartMode;
-extern UART_HandleTypeDef huart2;
-
-extern uint16_t online_timeouts[165];
-extern uint8_t available_positioners[20];
 /* USER CODE END EC */
 
 /* Exported macro ------------------------------------------------------------*/
@@ -88,18 +56,7 @@ extern uint8_t available_positioners[20];
 void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
-void ActivateEvent(unsigned int ev);
-void SetEventParameters(unsigned char motor);
-void ClearStatus();
-int realMain(char* reserve);
-void HallVoltage(void);
-void update_flash_backup();
-void set_tx_flag(uint8_t* tx_buffer, uint8_t length);
-void bindByChannel_check();
-void onlineDevices_check();
-int isOnlineDevice(unsigned int dev);
-void auto_BaudRate();
-void bindMode_check();
+
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
@@ -209,13 +166,6 @@ void bindMode_check();
 #define BOOT_Pin GPIO_PIN_3
 #define BOOT_GPIO_Port GPIOH
 /* USER CODE BEGIN Private defines */
-#define LORA 1
-#define XBEE 2
-#define NONE 0
-
-#define KVARK 5
-#define XBEE2RS485 7
-#define DEVICE KVARK
 
 /* USER CODE END Private defines */
 

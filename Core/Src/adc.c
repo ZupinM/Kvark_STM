@@ -23,8 +23,6 @@
 /* USER CODE BEGIN 0 */
 
 uint32_t g_ADCBuffer[ADC_BUFFER_LENGTH];
-extern bldc_motor bldc_motors[BLDC_MOTOR_COUNT];
-extern bldc_misc  bldc_cfg;
 
 /* USER CODE END 0 */
 
@@ -47,14 +45,14 @@ void MX_ADC1_Init(void)
   /** Common config
   */
   hadc1.Instance = ADC1;
-  hadc1.Init.ClockPrescaler = ADC_CLOCK_ASYNC_DIV1;
+  hadc1.Init.ClockPrescaler = ADC_CLOCK_ASYNC_DIV2;
   hadc1.Init.Resolution = ADC_RESOLUTION_12B;
   hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
   hadc1.Init.ScanConvMode = ADC_SCAN_ENABLE;
   hadc1.Init.EOCSelection = ADC_EOC_SEQ_CONV;
   hadc1.Init.LowPowerAutoWait = DISABLE;
   hadc1.Init.ContinuousConvMode = ENABLE;
-  hadc1.Init.NbrOfConversion = 8;
+  hadc1.Init.NbrOfConversion = 3;
   hadc1.Init.DiscontinuousConvMode = DISABLE;
   hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
   hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
@@ -98,49 +96,9 @@ void MX_ADC1_Init(void)
   {
     Error_Handler();
   }
-  /** Configure Regular Channel
-  */
-  sConfig.Channel = ADC_CHANNEL_TEMPSENSOR;
-  sConfig.Rank = ADC_REGULAR_RANK_4;
-  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /** Configure Regular Channel
-  */
-  sConfig.Channel = ADC_CHANNEL_6;
-  sConfig.Rank = ADC_REGULAR_RANK_5;
-  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /** Configure Regular Channel
-  */
-  sConfig.Channel = ADC_CHANNEL_3;
-  sConfig.Rank = ADC_REGULAR_RANK_6;
-  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /** Configure Regular Channel
-  */
-  sConfig.Channel = ADC_CHANNEL_2;
-  sConfig.Rank = ADC_REGULAR_RANK_7;
-  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /** Configure Regular Channel
-  */
-  sConfig.Channel = ADC_CHANNEL_1;
-  sConfig.Rank = ADC_REGULAR_RANK_8;
-  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
   /* USER CODE BEGIN ADC1_Init 2 */
 
-  HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED);
+  //HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED);
 
   /* USER CODE END ADC1_Init 2 */
 
@@ -250,7 +208,7 @@ uint32_t ADCBatteryVoltage;
 
 void StartADC_DMA_Sequence(void){
 	//HAL_DMA_Abort(&hdma_adc1);  // Reset DMA destination address
-	  if(BatteryMeas_cnt++ > 100000){ //Measure battery voltage ~once per 20s
+	  /*if(BatteryMeas_cnt++ > 100000){ //Measure battery voltage ~once per 20s
 		  BatteryMeas_cnt = 0;
 		  SetADC_BatteryMeas();
 		  HAL_ADC_Start_DMA(&hadc1, g_ADCBuffer, 1);
@@ -258,8 +216,11 @@ void StartADC_DMA_Sequence(void){
 	  }else if(BatteryMeas_cnt == 1){
 		  ADCBatteryVoltage = g_ADCBuffer[0];
 		  ClearADC_BatteryMeas();
-	  }
-	HAL_ADC_Start_DMA(&hadc1, g_ADCBuffer, ADC_BUFFER_LENGTH);
+	  }*/
+	if(HAL_ADC_Start_DMA(&hadc1, g_ADCBuffer, ADC_BUFFER_LENGTH) != HAL_OK)
+	{
+		Error_Handler();
+	}
 
 }
 
@@ -291,83 +252,9 @@ void SetADC_BatteryMeas(void){
 
 }
 
-uint32_t Uavg;
-uint32_t TempAvg;
-uint32_t Iavg_A;
-uint32_t Iavg_B;
-uint32_t HFocavg;
-uint32_t VFocavg;
-uint32_t HALLavg;
-uint32_t zeroCurrent_voltage_0;
-uint32_t zeroCurrent_voltage_1;
 
 
-float GetAnalogValues(unsigned char measuring_point) {
 
-  if(Uavg == 0){	//First measurment unfiltered
-    Uavg = g_ADCBuffer[0];
-  }
-  Uavg = Uavg + ( (int)(g_ADCBuffer[1] - Uavg)*0.01);//integrator
-  Iavg_A = Iavg_A + ( (int)((g_ADCBuffer[2] - zeroCurrent_voltage_0) - Iavg_A)*0.01);//integrator
-  TempAvg = TempAvg + ( (int)(g_ADCBuffer[3] - TempAvg)*0.01);//integrator
-#if DEVICE == KVARK
-  Iavg_B = Iavg_B + ( (int)((g_ADCBuffer[4] - zeroCurrent_voltage_1) - Iavg_B)*0.01);//integrator
-#endif
-#if DEVICE != PICO  //No Hall voltage measurment on PICO
-  HALLavg = HALLavg + ( (int)(g_ADCBuffer[5] - HALLavg)*0.01);//integrator
-  VFocavg = VFocavg + ( (int)(g_ADCBuffer[6] - VFocavg)*0.01);//integrator
-  HFocavg = HFocavg + ( (int)(g_ADCBuffer[7] - HFocavg)*0.01);//integrator
-#endif
-
-  if(!(bldc_motors[0].status & BLDC_STATUS_MOVING)){ // get adc current reading in inactive states, to compensate op.amp offset
-    zeroCurrent_voltage_0 += (int)(g_ADCBuffer[2] - zeroCurrent_voltage_0)*0.001;
-    Iavg_A = 0;
-  }
-#if DEVICE == KVARK
-  if(!(bldc_motors[1].status & BLDC_STATUS_MOVING)){
-    zeroCurrent_voltage_1 += (int)(g_ADCBuffer[4] - zeroCurrent_voltage_1)*0.001;
-    Iavg_B = 0;
-  }
-#endif
-
-
-  switch(measuring_point){
-    case SUPPLY :
-      return (float)Uavg  / (bldc_cfg.UConvertRatio * 64);
-    case SUPPLY_UNFILTERED :
-      return (float)g_ADCBuffer[1] / (bldc_cfg.UConvertRatio * 64);
-    case BATTERY :
-    	return (float)ADCBatteryVoltage / 352;
-    case TEMPERATURE:
-      return __HAL_ADC_CALC_TEMPERATURE(TempAvg, 3300, ADC_RESOLUTION12b);
-    case CURRENT_A:
-    	return (float)Iavg_A / (bldc_cfg.IConvertRatio * 5);
-    case CURRENT_A_UNFILTERED:
-    	return (float)g_ADCBuffer[2] / (bldc_cfg.IConvertRatio * 5);
-#if DEVICE == KVARK
-    case CURRENT_B:
-    	return (float)Iavg_B / (bldc_cfg.IConvertRatio * 5);
-    case CURRENT_B_UNFILTERED:
-    	return (float)g_ADCBuffer[4] / (bldc_cfg.IConvertRatio * 5);
-#endif
-#if DEVICE != PICO
-    case HALL :
-      return (float)HALLavg  / (bldc_cfg.HConvertRatio * 64);
-    case VFOCUS :
-    	return (float)VFocavg  /  256;
-    case HFOCUS :
-    	return (float)HFocavg  /  256;
-#endif
-    default: return 0;
-  }
-}
-
-uint8_t MotorSelectI(unsigned char motor){
-	if(motor == 0)
-		return CURRENT_A;
-	else
-		return CURRENT_B;
-}
 
 
 
