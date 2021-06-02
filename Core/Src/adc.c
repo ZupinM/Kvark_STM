@@ -9,10 +9,10 @@
   * <h2><center>&copy; Copyright (c) 2021 STMicroelectronics.
   * All rights reserved.</center></h2>
   *
-  * This software component is licensed by ST under Ultimate Liberty license
-  * SLA0044, the "License"; You may not use this file except in compliance with
-  * the License. You may obtain a copy of the License at:
-  *                             www.st.com/SLA0044
+  * This software component is licensed by ST under BSD 3-Clause license,
+  * the "License"; You may not use this file except in compliance with the
+  * License. You may obtain a copy of the License at:
+  *                        opensource.org/licenses/BSD-3-Clause
   *
   ******************************************************************************
   */
@@ -51,7 +51,7 @@ void MX_ADC1_Init(void)
   hadc1.Init.ScanConvMode = ADC_SCAN_ENABLE;
   hadc1.Init.EOCSelection = ADC_EOC_SEQ_CONV;
   hadc1.Init.LowPowerAutoWait = DISABLE;
-  hadc1.Init.ContinuousConvMode = ENABLE;
+  hadc1.Init.ContinuousConvMode = DISABLE;
   hadc1.Init.NbrOfConversion = 3;
   hadc1.Init.DiscontinuousConvMode = DISABLE;
   hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
@@ -208,6 +208,7 @@ uint32_t ADCBatteryVoltage;
 
 void StartADC_DMA_Sequence(void){
 	//HAL_DMA_Abort(&hdma_adc1);  // Reset DMA destination address
+	HAL_ADC_Stop_DMA(&hadc1);
 	  /*if(BatteryMeas_cnt++ > 100000){ //Measure battery voltage ~once per 20s
 		  BatteryMeas_cnt = 0;
 		  SetADC_BatteryMeas();
@@ -219,7 +220,7 @@ void StartADC_DMA_Sequence(void){
 	  }*/
 	if(HAL_ADC_Start_DMA(&hadc1, g_ADCBuffer, ADC_BUFFER_LENGTH) != HAL_OK)
 	{
-		Error_Handler();
+		//Error_Handler();
 	}
 
 }
