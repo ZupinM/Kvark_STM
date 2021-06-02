@@ -94,16 +94,16 @@ int main(void)
   MX_GPIO_Init();
   MX_DMA_Init();
   MX_ADC1_Init();
-  MX_CRC_Init();
-  MX_RTC_Init();
- // MX_USART1_UART_Init();
-  MX_TIM1_Init();
-  MX_USB_DEVICE_Init();
-  MX_TIM3_Init();
-  MX_TIM16_Init();
- // MX_USART2_UART_Init();
-  MX_SPI3_Init();
-  //MX_USART3_UART_Init();
+ // MX_CRC_Init();
+ // MX_RTC_Init();
+  //MX_USART1_UART_Init();
+ // MX_TIM1_Init();
+  //MX_USB_DEVICE_Init();
+  //MX_TIM3_Init();
+  //MX_TIM16_Init();
+  //MX_USART2_UART_Init();
+  //MX_SPI3_Init();
+ // MX_USART3_UART_Init();
   /* USER CODE BEGIN 2 */
 
 
@@ -118,7 +118,11 @@ int main(void)
   {
 
     /* USER CODE END WHILE */
-
+	  HAL_Delay(100);
+	  int i;
+	  for( i = 0 ; i<100 ; i++);
+	  HAL_Delay(100);
+	  i = 0;
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
