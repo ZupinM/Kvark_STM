@@ -724,7 +724,7 @@ void write_values(unsigned char box, unsigned int IntTemp, float FloatTemp, unsi
    
    
    //locking parameters
-   case clflags:   LFLAGS = IntTemp; break;
+   case clflags:   *lflags_p = IntTemp; break;
    case clock_pin: if(!CFG_locked)lock_pin_code = IntTemp;break;
    case cUnlock:   if(IntTemp == lock_pin_code) CFG_unlock(); break;
    case cLock :    CFG_lock();   break;

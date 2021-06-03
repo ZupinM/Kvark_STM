@@ -22,6 +22,7 @@ unsigned int result[5];
 float        flash_backup[FLASH_USER_SIZE]; 	//polje spremenljivk, ki se zapisejo v flash
 unsigned int FlashWriteCounter;
 unsigned int crc_flash;
+int *lflags_p = (int*)&lflags;
 
 
 

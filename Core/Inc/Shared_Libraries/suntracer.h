@@ -197,10 +197,11 @@ typedef enum {
 //lflags
 #define cfgs_locked (1<<0)
 
-#define LFLAGS       (*((int *)&lflags))
-#define CFG_locked   (LFLAGS &   cfgs_locked)
-#define CFG_lock()   (LFLAGS |=  cfgs_locked)
-#define CFG_unlock() (LFLAGS &=~ cfgs_locked)
+extern int *lflags_p;
+#define LFLAGS       ( (int) lflags)
+#define CFG_locked   (*lflags_p &   cfgs_locked)
+#define CFG_lock()   (*lflags_p |=  cfgs_locked)
+#define CFG_unlock() (*lflags_p &=~ cfgs_locked)
 
 
 

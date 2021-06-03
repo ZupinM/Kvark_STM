@@ -19,11 +19,11 @@
 
 //#define GREEN 1
 
-#define MASTER 1
-#define SLAVE 0
-#define DISABLE 2     //bind mode
-#define BY_CHANNEL 3  //bind mode
-#define MASTER_BY_CHANNEL 4 //bind mode
+#define BIND_MASTER 1
+#define BIND_SLAVE 0
+#define BIND_EXIT 2     //bind mode
+#define BIND_BY_CHANNEL 3  //bind mode
+#define BIND_MASTER_BY_CHANNEL 4 //bind mode
 
 #define LORA_ID_MASTER 100
 

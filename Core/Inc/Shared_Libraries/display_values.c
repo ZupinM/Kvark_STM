@@ -512,7 +512,7 @@ void USB_display(void) {
     }
     
     if(screen_mux_B==21){
-      buf2pc_cnt += sprintf((char *)&Str[buf2pc_cnt],"$%c%d",clflags,LFLAGS);
+      buf2pc_cnt += sprintf((char *)&Str[buf2pc_cnt],"$%c%d",clflags,(int)lflags);
 #ifndef DISABLE_HELIOSTAT
       if( HTarget2!=1000)buf2pc_cnt += sprintf((char *)&Str[buf2pc_cnt],"$%c%.2f",cHTarget2,HTarget2);
       else               buf2pc_cnt += sprintf((char *)&Str[buf2pc_cnt],"$%cOff" ,cHTarget2);

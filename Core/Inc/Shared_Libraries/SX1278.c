@@ -256,24 +256,24 @@ void LoRa_Bind_Mode(uint8_t mode){
 
   }
 
-  if(mode == MASTER_BY_CHANNEL){ //binding with the same channel
+  if(mode == BIND_MASTER_BY_CHANNEL){ //binding with the same channel
     LoRa_bindMode_master = 1;
     LoRa_bindMode_slave = 0;
     set_LED(BLUE, 1, 0);
     LoRa_config(module.channel, LoRa_POWER_20DBM, LoRa_SF_10, LoRa_BW_62_5KHZ, LoRa_MAX_PACKET, RxMode);    
   }
-  else if (mode == MASTER) { // binding with channel 0
+  else if (mode == BIND_MASTER) { // binding with channel 0
     LoRa_bindMode_master = 1;
     set_LED(BLUE, 1, 0);
     LoRa_config(0, LoRa_POWER_20DBM, LoRa_SF_10, LoRa_BW_62_5KHZ, LoRa_MAX_PACKET, RxMode);
   } 
-  else if (mode == SLAVE) {
+  else if (mode == BIND_SLAVE) {
     LoRa_bindMode_slave = 1;
     set_LED(BLUE, 0, 0);
     set_LED(GREEN, 1, 2000);
     LoRa_config(0, LoRa_POWER_20DBM, LoRa_SF_10, LoRa_BW_62_5KHZ, LoRa_MAX_PACKET, RxMode);
   }
-  else if (mode == DISABLE) { //exit binding mode on slave or master
+  else if (mode == BIND_EXIT) { //exit binding mode on slave or master
     if (LoRa_bindMode_slave) {
       if(!LoRa_channel_received){
          module.channel = OriginalSettings.channel;
@@ -293,7 +293,7 @@ void LoRa_Bind_Mode(uint8_t mode){
         memset(tx_settings_buffer, 0x00, 10);
       }
     }
-  }else if(mode == BY_CHANNEL){   //
+  }else if(mode == BIND_BY_CHANNEL){   //
     LoRa_bindMode_slave = 1;
     set_LED(BLUE, 0, 0);
     set_LED(GREEN, 1, 2000);

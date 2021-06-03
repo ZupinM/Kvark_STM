@@ -819,14 +819,14 @@ void SystemClock_Config(void)
 void bindMode_check(){
 
   if (!LoRa_bindMode_slave && ButtonStatus & (1<<2)){
-    LoRa_Bind_Mode(SLAVE);
+    LoRa_Bind_Mode(BIND_SLAVE);
     ButtonStatus = 0;
   }
   if(LoRa_bindMode_slave){
     if(LoRa_channel_received){
       //LoRa_channel_received = 0;
       LoRa_bindMode_master = 0;
-      LoRa_Bind_Mode(DISABLE);
+      LoRa_Bind_Mode(BIND_EXIT);
     }
   }
 }
@@ -897,7 +897,7 @@ void bindByChannel_check(){
       timeout_master_check--;
   }else{
     if(!bindMode_byChannel){
-      LoRa_Bind_Mode(BY_CHANNEL);
+      LoRa_Bind_Mode(BIND_BY_CHANNEL);
       //debug_printf("bind by channel \n");
       checkRouting = 0;
       bindMode_byChannel = 1;
@@ -907,7 +907,7 @@ void bindByChannel_check(){
     }else{                      //no channel received,
       LoRa_bindMode_slave = 0;
       LoRa_bindMode_master = 1; //To let slave set orriginal settings
-      LoRa_Bind_Mode(DISABLE);
+      LoRa_Bind_Mode(BIND_EXIT);
       //debug_printf("bind disable \n");
       bindMode_byChannel = 0;
       bindCheck_timeout = AUTO_BIND_TIMEOUT2;
