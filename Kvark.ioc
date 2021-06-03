@@ -603,4 +603,4 @@ PB1.GPIOParameters=GPIO_Label
 PA7.Signal=ADCx_IN12
 PB4\ (NJTRST).Signal=SPI3_MISO
 PA6.Locked=true
-isbadioc=false
+isbadioc=true

@@ -35,6 +35,7 @@ void MX_RTC_Init(void)
   /* USER CODE END RTC_Init 0 */
 
   RTC_TimeTypeDef sTime = {0};
+  RTC_TimeTypeDef sTimeRead = {0};
   RTC_DateTypeDef sDate = {0};
 
   /* USER CODE BEGIN RTC_Init 1 */
@@ -56,6 +57,10 @@ void MX_RTC_Init(void)
   }
 
   /* USER CODE BEGIN Check_RTC_BKUP */
+  HAL_RTC_GetTime(&hrtc, &sTimeRead, RTC_FORMAT_BIN);
+  if (sTimeRead.Minutes > 1){
+	  return;							//RTC time already counting on battery
+  }
 
   /* USER CODE END Check_RTC_BKUP */
 
@@ -264,7 +269,7 @@ void getSolarDateTime(time_t_ *dt){
 
   tmpTime.date   = sDate.Date;
   tmpTime.month  = sDate.Month;
-  tmpTime.year   = sDate.Year;
+  tmpTime.year   = sDate.Year + 2000;
 
   TicksToDateTime(DateTimeToTicks(&tmpTime) + (longitude*240), dt);
 }
@@ -272,15 +277,20 @@ void getSolarDateTime(time_t_ *dt){
 void setSolarDateTime(time_t_ *dt){
   RTC_TimeTypeDef sTime = {0};
   RTC_DateTypeDef sDate = {0};
-  TicksToDateTime(DateTimeToTicks(dt) + (longitude*240), dt);
+  TicksToDateTime(DateTimeToTicks(dt) - (longitude*240), dt);
+
+  /*if (HAL_RTC_Init(&hrtc) != HAL_OK)
+  {
+    Error_Handler();
+  }*/
   sTime.Seconds = dt->seconds;
   sTime.Minutes = dt->minutes;
-  sTime.Hours = dt->minutes;
+  sTime.Hours = dt->hours;
   HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
 
   sDate.Date = dt->date;
   sDate.Month = dt->month;
-  sDate.Year = dt->year;
+  sDate.Year = dt->year - 2000;
   HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
 
 }
@@ -288,15 +298,20 @@ void setSolarDateTime(time_t_ *dt){
 void setGMTDateTime(time_t_ *dt){
 	  RTC_TimeTypeDef sTime = {0};
 	  RTC_DateTypeDef sDate = {0};
-	  TicksToDateTime(DateTimeToTicks(dt), dt);
+	  //TicksToDateTime(DateTimeToTicks(dt), dt);
+
+	  /*if (HAL_RTC_Init(&hrtc) != HAL_OK)
+	  {
+	    Error_Handler();
+	  }*/
 	  sTime.Seconds = dt->seconds;
 	  sTime.Minutes = dt->minutes;
-	  sTime.Hours = dt->minutes;
+	  sTime.Hours = dt->hours;
 	  HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
 
 	  sDate.Date = dt->date;
 	  sDate.Month = dt->month;
-	  sDate.Year = dt->year;
+	  sDate.Year = dt->year - 2000;
 	  HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
 
 }
@@ -314,7 +329,7 @@ void getGMTDateTime(time_t_ *dt){
 
 	  dt->date   = sDate.Date;
 	  dt->month  = sDate.Month;
-	  dt->year   = sDate.Year;
+	  dt->year   = sDate.Year + 2000;
 }
 
 void setSolarSeconds(uint32_t sec){
