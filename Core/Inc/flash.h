@@ -6,7 +6,7 @@
   #include "main.h"
 #else
   //#include "bootloader LPC1549/main.h"
-  #define BOOTLOADER
+  //#define BOOTLOADER
 
 #endif
 #include "Shared_Libraries/bldc.h"
@@ -18,15 +18,29 @@
 
 
 #define FLASH_USER_SIZE 180     //size in floats
-#define FLASH_USER_PAGE_1 254
+#define FLASH_USER_PAGE_1 254 //burned?
+//#define FLASH_USER_PAGE_1 252
 #define FLASH_ROW_SIZE 32  		// 32 Double Words
 #define BANK1_WRITE_START_ADDR  ((uint32_t)0x08000000) //Main flash memory ; Currently used memory is aliased at 0x0000000
 #define BANK1_WRITE_END_ADDR    BANK1_WRITE_START_ADDR + FLASH_BANK_SIZE //0x 0808 0000
 #define FLASH_USER_START_ADDR  (BANK1_WRITE_START_ADDR + FLASH_USER_PAGE_1*FLASH_PAGE_SIZE) //0x 0807 f000
 #define FLASH_USER_SIZE_BYTES ( FLASH_USER_SIZE * sizeof(float) )
 
-#define FLASH_ADDR_MAIN (BANK1_WRITE_END_ADDR - (FLASH_PAGE_SIZE*2))
+#define FLASH_ADDR_MAIN (BANK1_WRITE_END_ADDR - (FLASH_PAGE_SIZE*2)) //burned?
 #define FLASH_ADDR_BACKUP (BANK1_WRITE_END_ADDR - (FLASH_PAGE_SIZE*1))
+//#define FLASH_ADDR_MAIN (BANK1_WRITE_END_ADDR - (FLASH_PAGE_SIZE*4))
+//#define FLASH_ADDR_BACKUP (BANK1_WRITE_END_ADDR - (FLASH_PAGE_SIZE*3))
+
+
+#define BOOT_VERSION_ADDR         0x0807ef00
+#define BOOT_HW_REV_ADDR          0x0807ef04
+#define BOOT_DEVTYPE_ADDR         0x0807ef08
+#define BOOT_APP_MINVERSION_ADDR  0x0807ef0C
+
+#define BOOT_VERSION		*((unsigned int *)BOOT_VERSION_ADDR)
+#define BOOT_HW_REV		*((unsigned int *)BOOT_HW_REV_ADDR)
+#define BOOT_DEVTYPE		*((unsigned int *)BOOT_DEVTYPE_ADDR)
+#define BOOT_APP_MINVERSION	*((unsigned int *)BOOT_APP_MINVERSION_ADDR)
 
 
 typedef void (*IAP)(unsigned int [],unsigned int[]);
@@ -82,6 +96,7 @@ void flash_read (unsigned int read_address);
 void update_flash_backup();
 int flash_write(unsigned int write_address);
 void read_SN();
+void sys_data_write(void);
   
 
 

@@ -127,18 +127,6 @@ Header file za SunTracer
 #define EVENT_LINE_R_FINISHED				(1<<2)
 #define EVENT_LINE_R_CANCELED				(1<<3)
 
-
-
-#define BOOT_VERSION_ADDR         0x7F00
-#define BOOT_HW_REV_ADDR          0x7F04
-#define BOOT_DEVTYPE_ADDR         0x7F08
-#define BOOT_APP_MINVERSION_ADDR  0x7F0C
-
-#define BOOT_VERSION		*((unsigned int *)BOOT_VERSION_ADDR)
-#define BOOT_HW_REV		*((unsigned int *)BOOT_HW_REV_ADDR)
-#define BOOT_DEVTYPE		*((unsigned int *)BOOT_DEVTYPE_ADDR)
-#define BOOT_APP_MINVERSION	*((unsigned int *)BOOT_APP_MINVERSION_ADDR)
-
 //************** deklaracije ****************
 
 void AutoClearFlag(void);

@@ -46,6 +46,7 @@
 #include "Shared_Libraries/config.h"
 #include "flash.h"
 #include "Shared_Libraries/modbus.h"
+#include "RTT/SEGGER_RTT.h"
 
 #define DAY_MS 	 86400000
 #define HOUR_MS (DAY_MS/24)
@@ -226,6 +227,12 @@ unsigned int sigma_just_connected = 0;
 #define AUTO_BIND_TIMEOUT 20000
 #define AUTO_BIND_TIMEOUT2 1000
 
+SEGGER_RTT_PRINTF_DESC BufferDesc;
+char acBuffer[SEGGER_RTT_PRINTF_BUFFER_SIZE];
+  unsigned NumDigits = 4;
+  unsigned FormatFlags = 0;
+  unsigned FieldWidth = 0;
+
 uint8_t transceiver = NONE;
 uint8_t transceiver_saved;
 uint8_t tx_settings_flag;
@@ -244,6 +251,8 @@ uint8_t tx_buffered_flag;
 uint32_t timeout_master_check = AUTO_BIND_TIMEOUT;
 uint8_t tx_packet_buffer[BUFSIZE];
 uint32_t tx_packet_length;
+uint8_t SPI_RxFifo_cmplt;
+uint8_t SPI_TxFifo_cmplt;
 
 uint16_t online_timeouts[165];
 uint8_t available_positioners[20];
@@ -397,8 +406,12 @@ int main(void)
 
   int LoadDefaults = 0;
   int startup = 50;
+
+  //HAL_Delay(500);
+
+  //sys_data_write();
   //Watchdog_Init();
-  //read_SN();
+  read_SN();
 
   micro_mode = MICRO_MODE_STANDALONE;
   micro_mode = AxisEnabled(2);
@@ -447,14 +460,11 @@ int main(void)
     }
   }
 
-  //start MODBUS communication
-  unsigned int xbeeCheckTimer = 0;
-  //LoRa_SPI_init();
   //        channel,  tx power, SF=spread factor, bandwidth,   msg length(only needed when SF=6)  ,  tx/rx
   if(module.spFactor > 6 && module.spFactor < 11)
     transceiver = LoRa_config(module.channel, module.power, module.spFactor, module.LoRa_BW, LoRa_MAX_PACKET, RxMode);
   else
-    transceiver = LoRa_config(42, LoRa_POWER_20DBM, LoRa_SF_7, LoRa_BW_500KHZ, LoRa_MAX_PACKET, RxMode); //default settings
+    transceiver = LoRa_config(42, LoRa_POWER_20DBM, LoRa_SF_7, LoRa_BW_250KHZ, LoRa_MAX_PACKET, RxMode); //default settings
   if(transceiver == LORA){
     //LPC_GPIO_PORT->DIR[0] |= (1<<5) | (1<<6); //LED output
   }
@@ -476,10 +486,10 @@ int main(void)
   //*****control loop*******
 
   //unsigned int countRsRx = 0;
-
+  SEGGER_RTT_ConfigUpBuffer(0, NULL, NULL, 0, SEGGER_RTT_MODE_NO_BLOCK_SKIP);
   flags &= ~(1 << reset_it);  // do not reset for begin
   /* USER CODE END 2 */
-
+  int systick_count_prev = 0;
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
@@ -492,15 +502,8 @@ int main(void)
 	       continue;
 	     systick_ms=0;       // execute every 1ms
 
-
-	     // ZigBee check connection
-	     if(transceiver == NONE) {
-	       xbeeCheckTimer++;
-	       if(xbeeCheckTimer >= 5000) {
-	         //xbee_conCheck();
-	         xbeeCheckTimer = 0;
-	       }
-	     }
+	     //SEGGER_RTT_printf(0, "main period:%d\r\n", systick_count -systick_count_prev);
+	     //systick_count_prev = systick_count;
 
 	     /*// reset bit RS485 TX (data flow RS485)
 	     if (uartMode == UART_MODE_RS485) {
@@ -549,11 +552,13 @@ int main(void)
 	     }
 
 
-	   //store parameters in flash - delayed
+	   //store parameters in flash - check once per second
 	     if(!bldc_Active(0) && !bldc_Active(1)){
-	       if (store_in_flash==1) flash_write(FLASH_ADDR_BACKUP);
-	       if (store_in_flash==101) upgrExe_gl = 1;
+	       if (store_in_flash==1) flash_write(FLASH_ADDR_MAIN);
+	       //if (store_in_flash==101) upgrExe_gl = 1;
 	       if (store_in_flash!=0) store_in_flash--;
+	       else store_in_flash = 1000;
+
 	     }
 
 	     getSolarDateTime(&time);
@@ -640,6 +645,19 @@ int main(void)
 
 	     if (transceiver == LORA) {
 
+	 		if(SPI_TxFifo_cmplt == 1){
+		 		 uint8_t tmp = 0x8b;
+		 		 LoRa_SPIWrite(LR_RegOpMode, &tmp, 1); //Tx Mode
+		 		 SPI_TxFifo_cmplt = 0;
+	 		}
+			if(SPI_RxFifo_cmplt == 1){
+				lora_int_stat = 0;
+				checkRouting = 1;
+				uint8_t tmp = 0x8D;
+				LoRa_SPIWrite(LR_RegOpMode, &tmp, 1); //Rx Mode
+				rxOffline_counter = 10000;
+				SPI_RxFifo_cmplt = 0;
+			}
 	       if(lora_int_stat == TRANSMISSION_FINISHED)
 	         tx_finished();
 	       else if(lora_int_stat == PACKET_RECEIVED)
@@ -652,7 +670,7 @@ int main(void)
 	         modbus_ReqProcessed(); //re-enable reception
 	       }
 	       else if(module.packetReady){
-	         modbus_cmd1();              // LoRa received, forward through 485->nano
+	         //modbus_cmd1();              // LoRa received, forward through 485->nano
 	         timeout_master_check = AUTO_BIND_TIMEOUT;
 	         modbus_ReqProcessed1();      // re-enable reception
 	       }

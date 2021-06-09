@@ -168,12 +168,12 @@ void bldc_Comutate(unsigned char motor);
 unsigned char ButtonStates() {
   unsigned char val = 0;
 
-  if(~HAL_GPIO_ReadPin(BT1_GPIO_Port, BT1_Pin))
+  if(HAL_GPIO_ReadPin(BT1_GPIO_Port, BT1_Pin) == GPIO_PIN_RESET)
     val |= 1<<0;
-  if(~HAL_GPIO_ReadPin(BT2_GPIO_Port, BT2_Pin))
+  if(HAL_GPIO_ReadPin(BT2_GPIO_Port, BT2_Pin) == GPIO_PIN_RESET)
     val |= 1<<1;
   #ifdef BT3_Pin
-  if(~HAL_GPIO_ReadPin(BT3_GPIO_Port, BT3_Pin))
+  if(HAL_GPIO_ReadPin(BT3_GPIO_Port, BT3_Pin) == GPIO_PIN_RESET)
     val |= 1<<2;
   #endif
   return (val & 0x07);
@@ -183,20 +183,20 @@ int bldc_ReadHall(unsigned char motor){
 
   int res = 0;  
   if (motor == 0) {
-	  if(HAL_GPIO_ReadPin(HALL_A1_GPIO_Port, HALL_A1_Pin ))
+	  if(HAL_GPIO_ReadPin(HALL_A1_GPIO_Port, HALL_A1_Pin ) == GPIO_PIN_SET)
         res |= 1<<0;
-	  if(HAL_GPIO_ReadPin(HALL_A2_GPIO_Port, HALL_A2_Pin ))
+	  if(HAL_GPIO_ReadPin(HALL_A2_GPIO_Port, HALL_A2_Pin ) == GPIO_PIN_SET)
         res |= 1<<1;
-	  if(HAL_GPIO_ReadPin(HALL_A3_GPIO_Port, HALL_A3_Pin ))
+	  if(HAL_GPIO_ReadPin(HALL_A3_GPIO_Port, HALL_A3_Pin ) == GPIO_PIN_SET)
         res |= 1<<2;
   }
 #if DEVICE == KVARK
   else if ( motor == 1){
-	  if(HAL_GPIO_ReadPin(HALL_B1_GPIO_Port, HALL_B1_Pin ))
+	  if(HAL_GPIO_ReadPin(HALL_B1_GPIO_Port, HALL_B1_Pin ) == GPIO_PIN_SET)
         res |= 1<<0;
-	  if(HAL_GPIO_ReadPin(HALL_B2_GPIO_Port, HALL_B2_Pin ))
+	  if(HAL_GPIO_ReadPin(HALL_B2_GPIO_Port, HALL_B2_Pin ) == GPIO_PIN_SET)
         res |= 1<<1;
-	  if(HAL_GPIO_ReadPin(HALL_B3_GPIO_Port, HALL_B3_Pin ))
+	  if(HAL_GPIO_ReadPin(HALL_B3_GPIO_Port, HALL_B3_Pin ) == GPIO_PIN_SET)
         res |= 1<<2;
   }
 #endif
@@ -464,7 +464,6 @@ int bldc_setPosition(unsigned char motor, float newpos, int windmode) { //go to 
 #if BLDC_MOTOR_COUNT > 1
     if( (target_error(bldc_cm->index) < (bldc_cm->pid.deadband * 5)) && (target_error(OTHER_MOTOR(bldc_cm->index)) > (bldc_cm->pid.deadband * 5)) && (!any_motor_moving)){
         bldc_cm = &bldc_motors[OTHER_MOTOR(bldc_cm->index)];
-        flash_write(FLASH_ADDR_MAIN);
     }
 #endif
 
@@ -834,23 +833,23 @@ int bldc_HomeSwitchActive(unsigned char motor , unsigned char switch_h_l) {
   if (motor == 0){
 #if DEVICE != PICO
     if(!ES_0_normallyOpenLo && !switch_h_l)
-      return(!HAL_GPIO_ReadPin(END_SW_A_LO_GPIO_Port, END_SW_A_LO_Pin));
+      return(~HAL_GPIO_ReadPin(END_SW_A_LO_GPIO_Port, END_SW_A_LO_Pin));
     else if(ES_0_normallyOpenLo && !switch_h_l)
     	return(HAL_GPIO_ReadPin(END_SW_A_LO_GPIO_Port, END_SW_A_LO_Pin));
 #endif
     if(!ES_0_normallyOpenHi && switch_h_l)
-    	return(!HAL_GPIO_ReadPin(END_SW_A_HI_GPIO_Port, END_SW_A_HI_Pin));
+    	return(~HAL_GPIO_ReadPin(END_SW_A_HI_GPIO_Port, END_SW_A_HI_Pin));
     else if(ES_0_normallyOpenHi && switch_h_l)
     	return(HAL_GPIO_ReadPin(END_SW_A_HI_GPIO_Port, END_SW_A_HI_Pin));
   }
 #if DEVICE != PICO
   else if (motor == 1){
     if(!ES_1_normallyOpenLo && !switch_h_l)
-    	return(!HAL_GPIO_ReadPin(END_SW_A_LO_GPIO_Port, END_SW_A_LO_Pin));
+    	return(~HAL_GPIO_ReadPin(END_SW_A_LO_GPIO_Port, END_SW_A_LO_Pin));
     else if(ES_1_normallyOpenLo && !switch_h_l)
     	return(HAL_GPIO_ReadPin(END_SW_A_LO_GPIO_Port, END_SW_A_LO_Pin));
     else if(!ES_1_normallyOpenHi && switch_h_l)
-    	return(!HAL_GPIO_ReadPin(END_SW_A_HI_GPIO_Port, END_SW_A_HI_Pin));
+    	return(~HAL_GPIO_ReadPin(END_SW_A_HI_GPIO_Port, END_SW_A_HI_Pin));
     else if(ES_1_normallyOpenHi && switch_h_l)
     	return(HAL_GPIO_ReadPin(END_SW_A_HI_GPIO_Port, END_SW_A_HI_Pin));
   }

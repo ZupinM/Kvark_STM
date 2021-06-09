@@ -39,7 +39,7 @@ unsigned int focus_state;
 
 
 void focus_init(){
-   signed short tmps;
+   signed short tmps = 0;
    
    //tmps  = BKP_ReadBackupRegister(BKP_DR6); 
    focus_offsetA=((float)tmps)/3000;
@@ -64,32 +64,32 @@ void focus_init(){
 
 void focus_calc_A(){
    double diff;
-   signed short   tmp;
+   //signed short   tmp;
    
-   diff           = f_FocusMiddleA - adc4_VAL; 
+   diff           = f_FocusMiddleA - GetAnalogValues(VFOCUS);
    focus_offsetA -= diff * 0.0001;
   
    if(focus_offsetA >  focus_max_offset) focus_offsetA =  focus_max_offset;
    if(focus_offsetA < -focus_max_offset) focus_offsetA = -focus_max_offset;
      
    
-   tmp=(signed short)(focus_offsetA*3000.0);
+   //tmp=(signed short)(focus_offsetA*3000.0);
    //BKP_WriteBackupRegister(BKP_DR6,tmp);
 }
 
 
 void focus_calc_B(){
    double diff;
-   signed short   tmp;
+   //signed short   tmp;
    
-   diff           = f_FocusMiddleB - adc3_VAL ;
+   diff           = f_FocusMiddleB - GetAnalogValues(HFOCUS) ;
    focus_offsetB -= diff * 0.0001;
   
  
    if(focus_offsetB >  focus_max_offset)  focus_offsetB  =  focus_max_offset;
    if(focus_offsetB < -focus_max_offset)  focus_offsetB  = -focus_max_offset;
    
-   tmp=(signed short)(focus_offsetB*3000.0);
+   //tmp=(signed short)(focus_offsetB*3000.0);
    //BKP_WriteBackupRegister(BKP_DR7,tmp);
 }
 

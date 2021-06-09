@@ -146,6 +146,7 @@ float pid_calc(pid *a)
 {
     int err;
     float pterm, dterm, result, ferror;
+    ferror = 0;
 
     err = *(a->sp) - *(a->pv);
 

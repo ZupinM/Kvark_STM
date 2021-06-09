@@ -124,6 +124,8 @@ void bindMode_check();
 #define MOTOR_I_SENS_B_GPIO_Port GPIOA
 #define AD_input_2_Pin GPIO_PIN_3
 #define AD_input_2_GPIO_Port GPIOA
+#define LORA_NSS_Pin GPIO_PIN_4
+#define LORA_NSS_GPIO_Port GPIOA
 #define USUPPLY_Pin GPIO_PIN_5
 #define USUPPLY_GPIO_Port GPIOA
 #define WIND_Pin GPIO_PIN_6
@@ -166,6 +168,8 @@ void bindMode_check();
 #define HALL_B2_GPIO_Port GPIOD
 #define END_SW_A_LO_Pin GPIO_PIN_10
 #define END_SW_A_LO_GPIO_Port GPIOD
+#define LORA_DIO6_Pin GPIO_PIN_11
+#define LORA_DIO6_GPIO_Port GPIOD
 #define END_SW_A_HI_Pin GPIO_PIN_13
 #define END_SW_A_HI_GPIO_Port GPIOD
 #define END_SW_B_HI_Pin GPIO_PIN_14

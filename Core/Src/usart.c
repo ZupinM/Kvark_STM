@@ -82,7 +82,10 @@ void MX_USART1_UART_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN USART1_Init 2 */
-
+  if(HAL_UART_Receive_DMA(&huart1, (uint8_t *)UARTBuffer0, BUFSIZE) != HAL_OK) //Start receiving
+  {
+    Error_Handler();
+  }
   /* USER CODE END USART1_Init 2 */
 
 }
@@ -113,10 +116,7 @@ void MX_USART2_UART_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN USART2_Init 2 */
-  if(HAL_UART_Receive_DMA(&huart2, (uint8_t *)UARTBuffer2, BUFSIZE) != HAL_OK) //Start receiving
-  {
-    Error_Handler();
-  }
+
   /* USER CODE END USART2_Init 2 */
 
 }
@@ -138,7 +138,7 @@ void MX_USART3_UART_Init(void)
   huart3.Init.StopBits = UART_STOPBITS_1;
   huart3.Init.Parity = UART_PARITY_NONE;
   huart3.Init.Mode = UART_MODE_TX_RX;
-  huart3.Init.HwFlowCtl = UART_HWCONTROL_RTS_CTS;
+  huart3.Init.HwFlowCtl = UART_HWCONTROL_NONE;
   huart3.Init.OverSampling = UART_OVERSAMPLING_16;
   huart3.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
   huart3.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
@@ -255,7 +255,6 @@ void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle)
     /**USART3 GPIO Configuration
     PC4     ------> USART3_TX
     PC5     ------> USART3_RX
-    PD11     ------> USART3_CTS
     PD12     ------> USART3_RTS
     */
     GPIO_InitStruct.Pin = GPIO_PIN_4|GPIO_PIN_5;
@@ -265,7 +264,7 @@ void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle)
     GPIO_InitStruct.Alternate = GPIO_AF7_USART3;
     HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-    GPIO_InitStruct.Pin = GPIO_PIN_11|GPIO_PIN_12;
+    GPIO_InitStruct.Pin = GPIO_PIN_12;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
@@ -334,12 +333,11 @@ void HAL_UART_MspDeInit(UART_HandleTypeDef* uartHandle)
     /**USART3 GPIO Configuration
     PC4     ------> USART3_TX
     PC5     ------> USART3_RX
-    PD11     ------> USART3_CTS
     PD12     ------> USART3_RTS
     */
     HAL_GPIO_DeInit(GPIOC, GPIO_PIN_4|GPIO_PIN_5);
 
-    HAL_GPIO_DeInit(GPIOD, GPIO_PIN_11|GPIO_PIN_12);
+    HAL_GPIO_DeInit(GPIOD, GPIO_PIN_12);
 
   /* USER CODE BEGIN USART3_MspDeInit 1 */
 

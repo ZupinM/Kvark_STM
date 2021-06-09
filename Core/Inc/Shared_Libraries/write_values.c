@@ -242,7 +242,7 @@ void write_values(unsigned char box, unsigned int IntTemp, float FloatTemp, unsi
     }
 
     case cLoRa_id:
-    LoRa_id = FloatTemp, flash_write(FLASH_ADDR_BACKUP);
+    LoRa_id = FloatTemp; //flash_write(FLASH_ADDR_BACKUP);
     break;
 
     case cchannel:              module.channel = IntTemp; break;
@@ -601,7 +601,7 @@ void write_values(unsigned char box, unsigned int IntTemp, float FloatTemp, unsi
                                 else
                                   bldc_SetInvert(1,0);
                                  
-                                flash_write(FLASH_ADDR_BACKUP);
+                                //flash_write(FLASH_ADDR_BACKUP);
                                 break;
                               
     case cnormally_close_es:
@@ -609,7 +609,7 @@ void write_values(unsigned char box, unsigned int IntTemp, float FloatTemp, unsi
       ES_1_normallyOpenLo = (IntTemp & (1<<1)) >> 1;
       ES_0_normallyOpenHi = (IntTemp & (1<<2)) >> 2;
       ES_1_normallyOpenHi = (IntTemp & (1<<3)) >> 3;
-      flash_write(FLASH_ADDR_BACKUP);
+      //flash_write(FLASH_ADDR_BACKUP);
       break;
     case cslave_id:             slave_addr=FloatTemp, flash_write(FLASH_ADDR_MAIN); break;
     //case cbuyflags:             change_buyFlags(IntTemp); cfg_wind_input(); break; //if (decrypt(box,IntTemp)) buyflags^=1<<(crypt_output&0x000000FF); break;        //CRYPTED:  MM AA AA xx, kjer xx pomeni kateri bit bo exor-an

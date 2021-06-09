@@ -29,21 +29,63 @@ int *lflags_p = (int*)&lflags;
 
 void read_SN(){
 
-   __disable_irq();
   // read unique ID via IAP
-  command[0] = 58;
-  iap_entry (command, result);
-  SN[0] = result[1];      //result [0] je rezultat branja, naprej so prebrani SN-ji
-  SN[1] = result[2];
-  SN[2] = result[3];
-  SN[3] = result[4];
-  __enable_irq();
+  SN[0] = HAL_GetUIDw0();
+  SN[1] = HAL_GetUIDw1();
+  SN[2] = HAL_GetUIDw2();
+  SN[3] = 0xaaaabbbb;
 }
 
 /***********************************************************
   FLASH READ/WRITE
 
 ************************************************************/
+typedef struct {
+  unsigned int LOADER_VER;
+  unsigned int HW_REV;
+  unsigned int DEV_TYPE;
+  unsigned int DEV_MIN_VERSION;
+  unsigned int FLASH_APP_SIZE;
+  unsigned int FLASH_APP_START_ADDRESS;
+  unsigned int reseved[58];
+} system_defs_t;
+
+uint32_t sysdefs[200];
+uint32_t flashError;
+
+void sys_data_write(void){
+
+
+	sysdefs[0] = 5000;
+	sysdefs[1] = 1;
+	sysdefs[2] = 5;
+	sysdefs[3] = 5000;
+	sysdefs[4] = 0x78000;
+	sysdefs[5] = 0x8000;
+
+	HAL_FLASH_Unlock();
+
+	  /* Clear OPTVERR bit set on virgin samples */
+	    __HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_OPTVERR);
+
+	  EraseInitStruct.TypeErase   = FLASH_TYPEERASE_PAGES;
+	  EraseInitStruct.Banks       = FLASH_BANK_1;
+	  EraseInitStruct.Page        = 252;
+	  EraseInitStruct.NbPages     = 3;
+
+	  if( HAL_FLASHEx_Erase(&EraseInitStruct, &PAGEError) != HAL_OK){
+		  flashError = HAL_FLASH_GetError();
+	  }
+
+	__HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_ALL_ERRORS);
+
+	for (int i=0 ; i<4 ; i++){
+	    if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, BOOT_VERSION_ADDR + i*8, (uint32_t)sysdefs[i]) != HAL_OK)
+	    {
+	    	flashError = HAL_FLASH_GetError();
+	    }
+	}
+}
 
 
 void flash_read (unsigned int read_address) {
@@ -217,8 +259,6 @@ int flash_write(unsigned int write_address) {
     write_page = FLASH_USER_PAGE_1 + 1;
   }
 
-  unsigned int number_FLASH_bytes = (FLASH_USER_SIZE-1)*4;
-
 #ifdef BOOTLOADER
   flash_backup[0] = (float)slave_addr;
   flash_backup[64] = (float)module.channel;
@@ -227,9 +267,7 @@ int flash_write(unsigned int write_address) {
   flash_backup[67] = (float)module.LoRa_BW;
   flash_backup[68] = (float)transceiver;
   flash_backup[147] = (float)bflags;
-
-  goto WRITE;
-#endif
+#else
   // upgrade indicator
   int upgrExe = 0;
   if(upgrExe_gl){ //always write flash, when received from usb
@@ -240,10 +278,6 @@ int flash_write(unsigned int write_address) {
   // system settings
   if(flash_backup[0] != (float)slave_addr) {
     flash_backup[0] = slave_addr;
-    upgrExe = 1;
-  }
-  if(flash_backup_ui[1] != FlashWriteCounter) {		
-    flash_backup_ui[1] = FlashWriteCounter;
     upgrExe = 1;
   }
   if(flash_backup_ui[2] != tracker_status) {
@@ -265,15 +299,12 @@ int flash_write(unsigned int write_address) {
 	
   if(flash_backup[7] != err_currentA) {
     flash_backup[7] = err_currentA;
-    upgrExe = 1;
   }
   if(flash_backup[8] != err_positionA) {
     flash_backup[8] = err_positionA;
-    upgrExe = 1;
   }
   if(flash_backup[9] != err_voltageA) {
     flash_backup[9] = err_voltageA;
-    upgrExe = 1;
   }
 
   if(flash_backup[10] != max_line_resistance) {
@@ -403,15 +434,12 @@ int flash_write(unsigned int write_address) {
 
   if(flash_backup[35] != err_currentB) {
     flash_backup[35] = err_currentB;
-    upgrExe = 1;
   }
   if(flash_backup[36] != err_positionB) {
     flash_backup[36] = err_positionB;
-    upgrExe = 1;
   }
   if(flash_backup[37] != err_voltageB) {
     flash_backup[37] = err_voltageB;
-    upgrExe = 1;
   }
 
   if(flash_backup[38] != (float)mb->state) {
@@ -570,15 +598,18 @@ int flash_write(unsigned int write_address) {
   if(!upgrExe)
     return 0;
 
-  WRITE:
+#endif
 
-  crc_flash = modbus_crc((uint8_t *)flash_backup, number_FLASH_bytes, CRC_NORMAL);
+  flash_backup_ui[1] = ++FlashWriteCounter;
+
+  crc_flash = modbus_crc((uint8_t *)flash_backup, FLASH_USER_SIZE_BYTES-4, CRC_NORMAL);
+  *(int *)&flash_backup[FLASH_USER_SIZE-1] = crc_flash;
 
   /* Unlock the Flash to enable the flash control register access *************/
   HAL_FLASH_Unlock();
 
   /* Clear OPTVERR bit set on virgin samples */
-    __HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_OPTVERR);
+    __HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_ALL_ERRORS);
 
   EraseInitStruct.TypeErase   = FLASH_TYPEERASE_PAGES;
   EraseInitStruct.Banks       = FLASH_BANK_1;
@@ -587,23 +618,26 @@ int flash_write(unsigned int write_address) {
 
   if( HAL_FLASHEx_Erase(&EraseInitStruct, &PAGEError) != HAL_OK){
      tracker_status |= SYS_PARAM_FLASH_ERR;  
+     flashError = HAL_FLASH_GetError();
   }
 
 
   uint32_t Address = write_address;
-
+  uint64_t* flash_backup_dw = (uint64_t*)flash_backup; //Double word
 
   //Write flash row by row
-  while (Address < ((write_address + FLASH_USER_SIZE) - (FLASH_ROW_SIZE*sizeof(uint64_t)) ))
+  while (Address < (write_address + FLASH_USER_SIZE_BYTES) )
   {
-    if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_FAST, Address, (uint32_t)flash_backup) == HAL_OK)
+    if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, Address, *(flash_backup_dw++)) == HAL_OK)
     {
-      Address = Address + (FLASH_ROW_SIZE*sizeof(uint64_t));
+      Address = Address + sizeof(uint64_t);
     }
    else
     {
       /* Error occurred while writing data in Flash memory.*/
       tracker_status |= SYS_PARAM_FLASH_ERR;
+      flashError = HAL_FLASH_GetError();
+      Error_Handler();
     }
   }
 return 0;

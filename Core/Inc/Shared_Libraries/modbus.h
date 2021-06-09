@@ -31,7 +31,7 @@
 #define CRC_MODE_NORMAL 1
 #define CRC_MODE_UPGRADE 2
 
-#define BOOT_ADDR       0x00007F00
+//#define BOOT_ADDR       0x00007F00
 #define APP_ADDR        0x00008100
 
 // bootloader commands

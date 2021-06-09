@@ -1359,9 +1359,9 @@ void modbus_cmd() {
 
 
   TX:
-      if(flashUpdate && !(any_motor_moving)) {
+      /*if(flashUpdate && !(any_motor_moving)) {
     	  flash_write(FLASH_ADDR_MAIN);
-      }
+      }*/
       crc_calc2 = modbus_crc((uint8_t *)UARTBuffer0, number_TX_bytes0, CRC_NORMAL);
       UARTBuffer0[number_TX_bytes0++] = crc_calc2 & 0xFF;
       UARTBuffer0[number_TX_bytes0++] = crc_calc2 / 0x100;
@@ -1375,8 +1375,8 @@ void modbus_cmd() {
             UARTCount1 = 0;
           }
           else if(transceiver == LORA){
-            crc_calc2 = modbus_crc((uint8_t *)UARTBuffer0, number_TX_bytes0, CRC_NORMAL);
-            if(UARTBuffer0[1] == MCMD_R_All_PARAM && crc_calc2 == 0){ //Read All Parameters 
+            //crc_calc2 = modbus_crc((uint8_t *)UARTBuffer0, number_TX_bytes0, CRC_NORMAL);
+            if(UARTBuffer0[1] == MCMD_R_All_PARAM){ //Read All Parameters
               UARTBuffer0[26] = LoRa_id;
               UARTBuffer0[66] = LoRa_get_rssi();
               number_TX_bytes0 -= 2; //delete and recalculate crc for LoRa packet
@@ -1770,7 +1770,7 @@ UARTCount2 = UARTCount0;
           conv_mode = UARTBuffer2[2];
           if(conv_mode == CONV_MODE_MASTER)
             slave_addr = LORA_ID_MASTER;
-          flash_write(FLASH_ADDR_BACKUP);
+          //flash_write(FLASH_ADDR_BACKUP);
           UARTBuffer2[2] = MACK_OK;
           number_TX_bytes2 = 3;
 
@@ -1898,7 +1898,7 @@ uint8_t LoRa_info_response(uint8_t * UARTBuffer, unsigned int* number_TX_bytes){
   switch (UARTBuffer[1]) {
 
     case CMD_RUN_GET_LOADER_VER: {
-      unsigned short ver = getVersionB();
+      unsigned short ver = BOOT_VERSION;
       UARTBuffer[2] = MACK_OK;
       UARTBuffer[3] = ver / 0x100;
       UARTBuffer[4] = ver % 0x100;
@@ -1947,7 +1947,7 @@ uint8_t LoRa_info_response(uint8_t * UARTBuffer, unsigned int* number_TX_bytes){
       module.power = UARTBuffer[3] & 0x03;
       module.spFactor = (UARTBuffer[3] & 0xf0) >> 4;
       module.LoRa_BW =  UARTBuffer[4]; 
-      flash_write(FLASH_ADDR_BACKUP);
+      //flash_write(FLASH_ADDR_BACKUP);
 
       if(UARTBuffer[3] & 0x04){
         LoRa_channel_received = 1;
@@ -2195,7 +2195,7 @@ void ack_reply() {
 }
 
 float mcmd_write_float1(){ 		//float
-  float abc [1];				   							//kazalec deluje samo na array - ne vem zakaj???
+  float abc [1] = {0};				   							//kazalec deluje samo na array - ne vem zakaj???
   unsigned int *p = (unsigned int *)abc;                   
   unsigned int temp;
 
@@ -2210,7 +2210,7 @@ float mcmd_write_float1(){ 		//float
 
 
 float mcmd_write_float(float dn_limit,float up_limit){ 		//float
-  float abc[1];				   							//kazalec deluje samo na array - ne vem zakaj???
+  float abc[1] = {0};				   							//kazalec deluje samo na array - ne vem zakaj???
   unsigned int *p = (unsigned int *)abc;                   
   unsigned int temp;
 
@@ -2230,7 +2230,7 @@ float mcmd_write_float(float dn_limit,float up_limit){ 		//float
 }
 
 float mcmd_write_limit_float(float dn_limit,float up_limit,float offset){ 		//float
-  float val ;				   							//kazalec deluje samo na array - ne vem zakaj???
+  float val = 0;				   							//kazalec deluje samo na array - ne vem zakaj???
   unsigned int *p = (unsigned int *)&val;                   
   unsigned int temp;
 
@@ -2380,7 +2380,7 @@ unsigned int xbReceivePacketRestore(char *pchBuffer)
 unsigned short getVersionB() {
 
   unsigned short ver;
-  unsigned char *addr = (unsigned char *)(BOOT_ADDR);       
+  unsigned char *addr = (unsigned char *)(BOOT_VERSION_ADDR);
 
   ver = *(addr + 1) * 0x100 + *addr;
 

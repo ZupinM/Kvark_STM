@@ -35,6 +35,9 @@ extern SPI_HandleTypeDef hspi3;
 
 /* USER CODE BEGIN Private defines */
 
+extern uint8_t SPI_RxFifo_cmplt;
+extern uint8_t SPI_TxFifo_cmplt;
+
 /* USER CODE END Private defines */
 
 void MX_SPI3_Init(void);
@@ -42,7 +45,7 @@ void MX_SPI3_Init(void);
 /* USER CODE BEGIN Prototypes */
 
 void LoRa_SPIWrite(uint8_t addr, uint8_t *pcBuffer, uint8_t cNbBytes);
-uint8_t LoRa_SPIRead(uint8_t addr, uint8_t *pcBuffer, uint8_t cNbBytes);
+void LoRa_SPIRead(uint8_t addr, uint8_t *pcBuffer, uint8_t cNbBytes);
 void LoRa_reset(void);
 void spi_rx_fifo_clear(void);
 

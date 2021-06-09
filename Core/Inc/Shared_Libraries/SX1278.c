@@ -85,15 +85,16 @@ void LoRa_TxPacket(uint8_t * txBuffer_, uint8_t length, uint32_t timeout) {
   LoRa_EntryTx(length, 8000);
 
   tmp[0] = 0x0;
-  LoRa_SPIWrite(LR_RegFifoAddrPtr, tmp, 1); //RegFifoAddrPtr
+  LoRa_SPIWrite(LR_RegFifoAddrPtr, tmp, 1);
   LoRa_SPIWrite(LR_RegPayloadLength, & length, 1);
 
-  transmission = 1;
 
   LoRa_SPIWrite(0x00, txBuffer, length); //Send packet
 
-  tmp[0] = 0x8b;
-  LoRa_SPIWrite(LR_RegOpMode, tmp, 1); //Tx Mode
+  transmission = 1;
+
+  //tmp[0] = 0x8b;
+  //LoRa_SPIWrite(LR_RegOpMode, tmp, 1); //Tx Mode
 
   return;
 
@@ -113,7 +114,6 @@ void tx_finished(void){
 
 void rx_finished(void){ 
   uint8_t tmp[10];
-  lora_int_stat = 0;
   LoRa_channel_received = 0;
   set_LED(GREEN, 1, 40); //set led for 200ms
 
@@ -134,11 +134,14 @@ void rx_finished(void){
  
   // If bad message, skip payload transfer      
   if(!msg_ok) {     
-    return;     
+    return;
+    lora_int_stat = 0;
   }
 
   LoRa_SPIRead(LR_RegFifoRxCurrentaddr, tmp, 1);
   LoRa_SPIWrite(LR_RegFifoAddrPtr, tmp, 1);
+
+  lora_int_stat = PACKET_RECEIVED_SPI_TRANSFER;
 
   LoRa_SPIRead(0x00, module.rxBuffer, module.packetLength);
       
@@ -146,12 +149,6 @@ void rx_finished(void){
 //        debug_printf("id:%#02x  cmd:%#02x %#02x %#02x %#02x %#02x %#02x %#02x" , module.rxBuffer[0], module.rxBuffer[1], module.rxBuffer[2], module.rxBuffer[3], module.rxBuffer[4], module.rxBuffer[5], module.rxBuffer[6], module.rxBuffer[7]);
 //        debug_printf("  %d \n" , module.packetLength);
 //      }
-
-  checkRouting = 1;
-
-  tmp[0] = 0x8D;
-  LoRa_SPIWrite(LR_RegOpMode, tmp, 1); //Rx Mode  
-  rxOffline_counter = 10000;
 }
 
 
@@ -188,7 +185,7 @@ void check_routing(void) {
 
 void set_tx_flag(uint8_t* tx_buffer, uint8_t length){
   uint32_t tx_timeout = 1000000;
-  while(tx_buffered_flag && tx_timeout > 0){
+  while(tx_buffered_flag && tx_timeout > 0){	//if buffer is full, wait to finish sending buffer
     tx_timeout--;
     if(transmission == 0){
       LoRa_TxPacket((uint8_t *)tx_packet_buffer, tx_packet_length, 8000);
@@ -308,6 +305,7 @@ void LoRa_Bind_Mode(uint8_t mode){
    
 uint8_t LoRa_config(uint8_t channel, uint8_t power, uint8_t spFactor, uint8_t LoRa_BW, uint8_t packetLength, uint8_t mode) {
 
+  LoRa_reset();
   uint8_t tmp[10];
 
   set_settings_flag = 0;
@@ -334,6 +332,8 @@ uint8_t LoRa_config(uint8_t channel, uint8_t power, uint8_t spFactor, uint8_t Lo
 
   else if(LoRa_BW == LoRa_BW_62_5KHZ)
     module.frequency = 0x6C4666 + 0x600 * channel;
+
+  HAL_Delay(10);//debug
 
   tmp[0] = module.frequency >> 16;
   tmp[1] = (module.frequency & 0xff00) >> 8;

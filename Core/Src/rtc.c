@@ -35,10 +35,10 @@ void MX_RTC_Init(void)
   /* USER CODE END RTC_Init 0 */
 
   RTC_TimeTypeDef sTime = {0};
-  RTC_TimeTypeDef sTimeRead = {0};
   RTC_DateTypeDef sDate = {0};
 
   /* USER CODE BEGIN RTC_Init 1 */
+  RTC_DateTypeDef sDateOnStartup = {0};
 
   /* USER CODE END RTC_Init 1 */
   /** Initialize RTC Only
@@ -57,8 +57,8 @@ void MX_RTC_Init(void)
   }
 
   /* USER CODE BEGIN Check_RTC_BKUP */
-  HAL_RTC_GetTime(&hrtc, &sTimeRead, RTC_FORMAT_BIN);
-  if (sTimeRead.Minutes > 1){
+  HAL_RTC_GetDate(&hrtc, &sDateOnStartup, RTC_FORMAT_BIN);
+  if (sDateOnStartup.Year > 0){
 	  return;							//RTC time already counting on battery
   }
 
@@ -78,7 +78,7 @@ void MX_RTC_Init(void)
   sDate.WeekDay = RTC_WEEKDAY_MONDAY;
   sDate.Month = RTC_MONTH_JANUARY;
   sDate.Date = 1;
-  sDate.Year = 21;
+  sDate.Year = 0;
 
   if (HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BIN) != HAL_OK)
   {
