@@ -128,7 +128,6 @@ void modbus_cmd() {
   unsigned int rxcnt;
   unsigned int Utemp;
   float Ftemp;
-  int flashUpdate = 0;
 
   if (uartMode == UART_MODE_XBEE) {
     unsigned int dataLength = 0;
@@ -234,7 +233,6 @@ void modbus_cmd() {
             Utemp=UARTBuffer0[2];
             ack_reply();
             slave_addr = Utemp;
-            flashUpdate = 1;
             backup_timeout = 200;         //4 sekundi zatem backup v flash
           } else {
             m_ack_state=MACK_UNRECOGNIZED_CMD;
@@ -267,7 +265,6 @@ void modbus_cmd() {
               Utemp = UARTBuffer0[18];
               ack_reply();
               slave_addr = Utemp;
-              flashUpdate = 1;
               backup_timeout = 200;       //4 sekundi zatem backup v flash
               break;
             }
@@ -302,7 +299,6 @@ void modbus_cmd() {
           Utemp = mcmd_write_int(0, 50);         //omejitev vpisa
           if (m_ack_state == 0) {
             number_of_poles = Utemp;
-            flashUpdate = 1;
             backup_timeout = 200;                     //4 sekundi zatem backup v flash
           }			 
           break;	
@@ -323,7 +319,6 @@ void modbus_cmd() {
           Ftemp = mcmd_write_limit_float (0.001, 10.0, 0);
           if (m_ack_state == 0) {
             bldc_Motor(0)->pid.pgain = Ftemp;
-            flashUpdate = 1;
           }
           break;
         }
@@ -331,7 +326,6 @@ void modbus_cmd() {
           Ftemp = mcmd_write_limit_float (0.000001, 1.0, 0);
           if (m_ack_state == 0) {
             bldc_Motor(0)->pid.igain = Ftemp;
-            flashUpdate = 1;
           }
           break;
         }
@@ -339,7 +333,6 @@ void modbus_cmd() {
           Ftemp = mcmd_write_limit_float (0.001, 10.0, 0);
           if (m_ack_state == 0) {
             bldc_Motor(0)->pid.dgain = Ftemp;
-            flashUpdate = 1;
           }
           break;
         }
@@ -360,7 +353,6 @@ void modbus_cmd() {
           Ftemp = mcmd_write_limit_float (0.001, 10.0, 0);
           if (m_ack_state == 0) {
             bldc_Motor(1)->pid.pgain = Ftemp;
-            flashUpdate = 1;
           }
           break;
         }
@@ -368,7 +360,6 @@ void modbus_cmd() {
           Ftemp = mcmd_write_limit_float (0.000001, 1.0, 0);
           if (m_ack_state == 0) {
             bldc_Motor(1)->pid.igain = Ftemp;
-            flashUpdate = 1;
           }
           break;
         }
@@ -376,7 +367,6 @@ void modbus_cmd() {
           Ftemp = mcmd_write_limit_float (0.001, 10.0, 0);
           if (m_ack_state == 0) {
             bldc_Motor(1)->pid.dgain = Ftemp;
-            flashUpdate = 1;
           }
           break;
         }
@@ -400,7 +390,6 @@ void modbus_cmd() {
           if (dbA <= 100 && dbB <= 100) {
             bldc_Motor(0)->pid.deadband = dbA;
             bldc_Motor(1)->pid.deadband = dbB;
-            flashUpdate = 1;
             ack_reply();
           }
           else
@@ -519,7 +508,6 @@ void modbus_cmd() {
 
           if (res ==  0) {
             ack_reply();
-            //flashUpdate = 1;
             break;
           }
           if(res == -2)
@@ -543,7 +531,6 @@ void modbus_cmd() {
 
           if(res ==  0){
             ack_reply();
-            //flashUpdate = 1;
             break;
           }
           if(res == -2) 
@@ -563,7 +550,6 @@ void modbus_cmd() {
           int res = bldc_Home(0);
           if (res == 0) {
             ack_reply();
-            flashUpdate = 1;
           }
           else {
             m_ack_state = MACK_SEE_STATUS_BYTE;
@@ -593,7 +579,6 @@ void modbus_cmd() {
 
           if(res ==  0) {
             ack_reply();
-            //flashUpdate = 1;
             break;
           }
           if(res == -2)
@@ -617,7 +602,6 @@ void modbus_cmd() {
 
           if(res ==  0) {
             ack_reply();
-            //flashUpdate = 1;
             break;
           }
           if(res == -2) 
@@ -636,7 +620,6 @@ void modbus_cmd() {
           usb_drive  = 0;
           int res = bldc_Home(1);
           if(res == 0) {
-        	  flashUpdate = 1;
             ack_reply();
           }
           else {
@@ -737,7 +720,6 @@ void modbus_cmd() {
           }
           Utemp_old = Utemp;  */
 
-          //flashUpdate = 1;    mzp
           break;
         }	
 
@@ -834,7 +816,6 @@ void modbus_cmd() {
           ES_1_normallyOpenLo = (Utemp & (1<<1)) >> 1;
           ES_0_normallyOpenHi = (Utemp & (1<<2)) >> 2;
           ES_1_normallyOpenHi = (Utemp & (1<<3)) >> 3;
-          flashUpdate = 1;
           backup_timeout = 200;
           break;
         }
@@ -849,7 +830,6 @@ void modbus_cmd() {
           Ftemp = mcmd_write_limit_float( bldc_Motor(0)->min_position, bldc_Motor(0)->max_position,0);    //omejitve vpisa 
           if (m_ack_state == 0) {
             bldc_Motor(0)->end_switchDetect = (Ftemp);
-            flashUpdate = 1;
           }
           break;
         }
@@ -864,7 +844,6 @@ void modbus_cmd() {
           //Ftemp=mcmd_write_float(0.0,10000);
           if (m_ack_state==0) {
             bldc_Motor(0)->min_position = Ftemp;
-            flashUpdate = 1;
             backup_timeout=200;                          //4 sekundi zatem backup v flash
           }
           break;
@@ -879,7 +858,6 @@ void modbus_cmd() {
           Ftemp = mcmd_write_float(bldc_Motor(0)->min_position, 5000);	//omejitve vpisa, max_range ne sme biti pod min_range
           if (m_ack_state == 0) {
             bldc_Motor(0)->max_position = Ftemp;
-            flashUpdate = 1;
             backup_timeout = 200;                       //4 sekundi zatem backup v flash
           }
           break;
@@ -894,7 +872,6 @@ void modbus_cmd() {
           Ftemp = mcmd_write_float(-bldc_Motor(0)->max_position, bldc_Motor(0)->max_position);		//omejitve vpisa, max_range ne sme biti pod min_range
           if (m_ack_state == 0) {
             bldc_Motor(0)->home_offset = Ftemp;
-            flashUpdate = 1;
             backup_timeout = 200;                       //4 sekundi zatem backup v flash
           }
           break;
@@ -909,7 +886,6 @@ void modbus_cmd() {
           Ftemp = mcmd_write_float(0.1, 10.0);		//omejitve vpisa	   
           if (m_ack_state == 0) {
             bldc_Motor(0)->I_limit = Ftemp;
-            flashUpdate = 1;
             backup_timeout = 200;			//4 sekundi zatem backup v flash
           }
           break;
@@ -925,7 +901,6 @@ void modbus_cmd() {
           Ftemp = mcmd_write_limit_float( bldc_Motor(1)->min_position, bldc_Motor(1)->max_position, 0);		//omejitve vpisa 
           if (m_ack_state == 0) {
             bldc_Motor(1)->end_switchDetect = (Ftemp);
-            flashUpdate = 1;
           }
           break;
         }
@@ -940,7 +915,6 @@ void modbus_cmd() {
           //Ftemp=mcmd_write_float(0.0,10000);
           if (m_ack_state == 0) {
             bldc_Motor(1)->min_position = Ftemp;
-            flashUpdate = 1;
             backup_timeout = 200;		//4 sekundi zatem backup v flash
           }
           break;
@@ -955,7 +929,6 @@ void modbus_cmd() {
           Ftemp = mcmd_write_float(bldc_Motor(1)->min_position, 5000);		//omejitve vpisa, max_range ne sme biti pod min_range
           if (m_ack_state == 0) {
             bldc_Motor(1)->max_position = Ftemp;
-            flashUpdate = 1;
             backup_timeout = 200;		//4 sekundi zatem backup v flash
           }
           break;
@@ -970,7 +943,6 @@ void modbus_cmd() {
           Ftemp = mcmd_write_float(-bldc_Motor(1)->max_position, bldc_Motor(1)->max_position);		//omejitve vpisa, max_range ne sme biti pod min_range
           if (m_ack_state == 0) {
             bldc_Motor(1)->home_offset = Ftemp;
-            flashUpdate = 1;
             backup_timeout=200;		//4 sekundi zatem backup v flash
           }
           break;
@@ -985,7 +957,6 @@ void modbus_cmd() {
           Ftemp = mcmd_write_float(0.1, 10.0);		//omejitve vpisa	   
           if (m_ack_state == 0) {
             bldc_Motor(1)->I_limit = Ftemp;
-            flashUpdate = 1;
             backup_timeout=200;					//4 sekundi zatem backup v flash
           }
           break;
@@ -1000,7 +971,6 @@ void modbus_cmd() {
           Ftemp = mcmd_write_float(0.0, 500.0);		//omejitve vpisa
           if (m_ack_state == 0) {
             bldc_config()->UConvertRatio = Ftemp;
-            flashUpdate = 1;
             backup_timeout = 200;			//4 sekundi zatem backup v flash
           }
           break;									
@@ -1014,7 +984,6 @@ void modbus_cmd() {
           Ftemp = mcmd_write_float(0.0, 500.0);
           if (m_ack_state == 0) {
             bldc_config()->IConvertRatio = Ftemp;
-            flashUpdate = 1;
             backup_timeout = 200;				//4 sekundi zatem backup v flash
           }		
           break;
@@ -1028,7 +997,6 @@ void modbus_cmd() {
           Ftemp = mcmd_write_float(bldc_Motor(0)->min_position, bldc_Motor(0)->max_position);		//omejitve vpisa, rest_position mora biti med min_range in max_range
           if (m_ack_state == 0) {
             bldc_Motor(0)->modbus_timeout_position = Ftemp;
-            flashUpdate = 1;
             backup_timeout = 200;				//4 sekundi zatem backup v flash
           }
           break;
@@ -1043,7 +1011,6 @@ void modbus_cmd() {
           Ftemp = mcmd_write_float(bldc_Motor(1)->min_position, bldc_Motor(1)->max_position);		//omejitve vpisa, rest_position mora biti med min_range in max_range
           if (m_ack_state == 0) {
             bldc_Motor(1)->modbus_timeout_position = Ftemp;
-            flashUpdate = 1;
             backup_timeout = 200;				//4 sekundi zatem backup v flash
           }
           break;
@@ -1060,7 +1027,6 @@ void modbus_cmd() {
           Utemp = mcmd_write_int(0, 4320000);		//omejitve vpisa, 4320000sekund = 50 dni
           if (m_ack_state==0) {
             modbus_timeout = Utemp;
-            flashUpdate = 1;
             backup_timeout = 200;		//4 sekundi zatem backup v flash
           }
           break;
@@ -1077,7 +1043,6 @@ void modbus_cmd() {
           Utemp = mcmd_write_int(0, 4320000);         //omejitev vpisa
           if (m_ack_state == 0) {
             modbus_timeout_delay = Utemp;
-            flashUpdate = 1;
             backup_timeout = 200;                     //4 sekundi zatem backup v flash
           }			 
           break;	
@@ -1093,7 +1058,6 @@ void modbus_cmd() {
           Utemp = mcmd_write_int(60, 4320000);		//omejitve vpisa, 60 s ... 4320000sekund = 50 dni
           if (m_ack_state == 0) {
             bldc_config()->homing_timeout = Utemp;
-            flashUpdate = 1;
             backup_timeout = 200;                       //4 sekundi zatem backup v flash
           }
           break;
@@ -1107,7 +1071,6 @@ void modbus_cmd() {
           Ftemp = mcmd_write_float(0.0, 100000.0);		//omejitev vpisa
           if (m_ack_state == 0) {
             bldc_Motor(0)->gear_ratio = Ftemp;
-            flashUpdate = 1;
             backup_timeout = 200;				//4 sekundi zatem backup v flash
           }		
           break;
@@ -1117,7 +1080,6 @@ void modbus_cmd() {
           Ftemp = mcmd_write_float(1, 10);		 //omejitev vpisa
           if (m_ack_state == 0) {
             bldc_Motor(0)->I_Inrush_ratio  =Ftemp;
-            flashUpdate = 1;
             backup_timeout=200;				//4 sekundi zatem backup v flash
           }
           break;
@@ -1127,7 +1089,6 @@ void modbus_cmd() {
           Ftemp = mcmd_write_float(100, 1000);		 //omejitev vpisa
           if (m_ack_state == 0) {
             bldc_Motor(0)->I_Inrush_time = Ftemp;
-            flashUpdate = 1;
             backup_timeout = 200;			//4 sekundi zatem backup v flash
           }
           break;
@@ -1147,7 +1108,6 @@ void modbus_cmd() {
           Ftemp = mcmd_write_float(0.05, 4);		 //omejitev vpisa
           if (m_ack_state == 0) {
             bldc_Motor(0)->Idetection = Ftemp;
-            flashUpdate = 1;
             backup_timeout = 200;			//4 sekundi zatem backup v flash
           }
           break;				
@@ -1167,7 +1127,6 @@ void modbus_cmd() {
           Ftemp = mcmd_write_float(0.0, 100000.0);		 //omejitev vpisa
           if (m_ack_state == 0) {
             bldc_Motor(1)->gear_ratio = Ftemp;
-            flashUpdate = 1;
             backup_timeout = 200;				//4 sekundi zatem backup v flash
           }		
           break;
@@ -1177,7 +1136,6 @@ void modbus_cmd() {
           Ftemp = mcmd_write_float(1, 10);		 //omejitev vpisa
           if (m_ack_state == 0) {
             bldc_Motor(1)->I_Inrush_ratio = Ftemp;
-            flashUpdate = 1;
             backup_timeout = 200;				//4 sekundi zatem backup v flash
           }
           break;
@@ -1187,7 +1145,6 @@ void modbus_cmd() {
           Ftemp = mcmd_write_float(100, 1000);		 //omejitev vpisa
           if (m_ack_state == 0) {
             bldc_Motor(1)->I_Inrush_time = Ftemp;
-            flashUpdate = 1;
             backup_timeout = 200;				//4 sekundi zatem backup v flash
           }
           break;
@@ -1207,7 +1164,6 @@ void modbus_cmd() {
           Ftemp = mcmd_write_float(0.05, 4);                    //omejitev vpisa
           if (m_ack_state == 0) {
             bldc_Motor(1)->Idetection = Ftemp;
-            flashUpdate = 1;
             backup_timeout = 200;				//4 sekundi zatem backup v flash
           }
           break;				
@@ -1266,7 +1222,6 @@ void modbus_cmd() {
           if(Utemp == SN[0])
             bldc_Lock(1);
           bldc_Stop(1);
-          flashUpdate = 1;
           backup_timeout = 200;
           break;
         }
@@ -1275,7 +1230,6 @@ void modbus_cmd() {
           Utemp = mcmd_write_int(0, 0xffffffff);
           if(Utemp == (SN[0] ^ SN[1] ^ SN[2] ^ SN[3] ^ 0x8f3b501c)) {
             bldc_Lock(0);
-            flashUpdate = 1;
             break;
           }
           m_ack_state = MACK_VALUE_OUT_OF_LIMIT;
@@ -1308,7 +1262,6 @@ void modbus_cmd() {
           Ftemp = mcmd_write_float(0.01, 10);		 //omejitev vpisa
           if (m_ack_state == 0) {
             max_line_resistance = Ftemp;
-            flashUpdate = 1;
             backup_timeout = 200;				//4 sekundi zatem backup v flash
           }
           ack_reply();
@@ -1359,9 +1312,6 @@ void modbus_cmd() {
 
 
   TX:
-      /*if(flashUpdate && !(any_motor_moving)) {
-    	  flash_write(FLASH_ADDR_MAIN);
-      }*/
       crc_calc2 = modbus_crc((uint8_t *)UARTBuffer0, number_TX_bytes0, CRC_NORMAL);
       UARTBuffer0[number_TX_bytes0++] = crc_calc2 & 0xFF;
       UARTBuffer0[number_TX_bytes0++] = crc_calc2 / 0x100;
@@ -1655,7 +1605,6 @@ void modbus_cmd1() {
   number_TX_bytes1 = 0;
 
   if (flags & (1 << reset_it)) {    
-    while (rxTimeout0 < 1000){};
     flash_write(FLASH_ADDR_BACKUP);
     //LPC_WWDT->FEED = 0xAA;
     //LPC_WWDT->FEED = 0x50;
@@ -2405,7 +2354,7 @@ void modbus_timeout_handling(unsigned int *modbus_cnt) {
       if (*modbus_cnt >= mtimeout) {   //sekunde
         flags |= Modbus_timeout;
       }else{
-        *modbus_cnt++;
+        (*modbus_cnt)++;
         flags &= ~Modbus_timeout;
       }
     }else{

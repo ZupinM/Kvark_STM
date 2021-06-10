@@ -200,8 +200,6 @@ void bindMode_check();
 #define USART2_TX_out2_GPIO_Port GPIOD
 #define USART2_RX_out1_Pin GPIO_PIN_6
 #define USART2_RX_out1_GPIO_Port GPIOD
-#define RS485_RTS_Pin GPIO_PIN_3
-#define RS485_RTS_GPIO_Port GPIOB
 #define LORA_MISO_Pin GPIO_PIN_4
 #define LORA_MISO_GPIO_Port GPIOB
 #define LORA_MOSI_Pin GPIO_PIN_5

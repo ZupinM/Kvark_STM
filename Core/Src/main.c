@@ -155,8 +155,6 @@ unsigned int green_led;					//utripanje LED
 unsigned int tick_1s;					//stevec za generiranj 1s intervala
 unsigned int counter10s;                                //stevec za generiranj 10s intervala
 unsigned int modbus_indicator;			//stevec dolzine utripa ob rs485 sprejetju stringa
-extern volatile int rxTimeout0;
-extern volatile int rxTimeout1;
 extern volatile int slaveCommandTimeout;
 
 extern volatile int systick_ms;
@@ -350,9 +348,6 @@ void SysTick_Handler(void)
 	    bldc_Stop(1);
 	    bldc_cm->status |= BLDC_STATUS_TO_DST_ERR;
 	  }
-
-	  rxTimeout0++;
-	  rxTimeout1++;
 	  slaveCommandTimeout++;
   /* USER CODE END SysTick_IRQn 0 */
   HAL_IncTick();
@@ -489,7 +484,7 @@ int main(void)
   SEGGER_RTT_ConfigUpBuffer(0, NULL, NULL, 0, SEGGER_RTT_MODE_NO_BLOCK_SKIP);
   flags &= ~(1 << reset_it);  // do not reset for begin
   /* USER CODE END 2 */
-  int systick_count_prev = 0;
+
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
@@ -611,7 +606,7 @@ int main(void)
 	     //bldc_I(0);
 
 	     // MODBUS RS485
-	     if(modbus_newRequest() && rxTimeout0 >= 8 && (
+	     if(modbus_newRequest() &&  (
 	       (UART_CheckIdleState(&huart2) && (uartMode == UART_MODE_RS485 || uartMode == UART_MODE_XBEE))))
 	     {
 	       if((UARTBuffer0[0] == LoRa_id || UARTBuffer0[0] == slave_addr || UARTBuffer0[0] == 0)
@@ -631,7 +626,7 @@ int main(void)
 	       else
 	         modbus_ReqProcessed();      // re-enable reception
 	     }
-	     else if(modbus_newRequest() && rxTimeout1 >= 8 &&
+	     else if(modbus_newRequest() &&
 	       UART_CheckIdleState(&huart2) && uartMode == UART_MODE_XBEE)
 	     {
 	       modbus_cmd ();
