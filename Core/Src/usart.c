@@ -69,7 +69,7 @@ void MX_USART1_UART_Init(void)
   /* USER CODE END USART1_Init 1 */
   huart1.Instance = USART1;
   huart1.Init.BaudRate = 19200;
-  huart1.Init.WordLength = UART_WORDLENGTH_8B;
+  huart1.Init.WordLength = UART_WORDLENGTH_9B;
   huart1.Init.StopBits = UART_STOPBITS_1;
   huart1.Init.Parity = UART_PARITY_EVEN;
   huart1.Init.Mode = UART_MODE_TX_RX;
@@ -86,6 +86,9 @@ void MX_USART1_UART_Init(void)
   {
     Error_Handler();
   }
+  __HAL_UART_DISABLE_IT(&huart1, UART_IT_PE);	//Disable Parity Error interrupt
+  __HAL_UART_DISABLE_IT(&huart1, UART_IT_FE);	//Disable Framing Error interrupt
+  __HAL_UART_DISABLE_IT(&huart1, UART_IT_ORE);	//Disable Overrun Error interrupt
   __HAL_UART_DISABLE_IT(&huart1, UART_IT_ERR);
   __HAL_UART_ENABLE_IT(&huart1, UART_IT_IDLE); //Enable UART Idle interrupt
   /* USER CODE END USART1_Init 2 */

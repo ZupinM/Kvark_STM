@@ -234,9 +234,9 @@ void USART1_IRQHandler(void)
 
 	    //ModbusState0 |= MODBUS_PACKET_RECIVED;
 
-	    //if(HAL_UART_DMAStop(&huart1) ) //sTOP receiving
+	    if(HAL_UART_DMAStop(&huart1) ) //sTOP receiving
 	    {
-	      //Error_Handler();
+	      Error_Handler();
 	    }
 	    if(HAL_UART_Receive_DMA(&huart1, (uint8_t *)UARTBuffer0, BUFSIZE) != HAL_OK) //Start receiving
 	    {
