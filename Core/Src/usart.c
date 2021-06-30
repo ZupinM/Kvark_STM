@@ -396,7 +396,7 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *UartHandle)
 
 void UARTSend(uint8_t *BufferPtr, uint32_t Length)
 {
-	  if(HAL_UART_Transmit_DMA(&huart2, (uint8_t*)BufferPtr, Length)!= HAL_OK)
+	  if(HAL_UART_Transmit_DMA(&huart1, (uint8_t*)BufferPtr, Length*2)!= HAL_OK) //Set length to double and treat HalfCplt interrupt as Transfer Complete
 	  {
 	    Error_Handler();
 	  }
@@ -464,22 +464,15 @@ void modbus_ReqProcessed()
 
 void reEnable_485_DMA_RX(void){
 
-	if (huart1.RxState == HAL_UART_STATE_READY){										//Reenable reception, when DMA is stoped in HAL_UART_RxCpltCallback
+	if (huart1.RxState == HAL_UART_STATE_READY && hdma_usart1_tx.State != HAL_DMA_STATE_BUSY){	//Reenable reception, when DMA is stoped in HAL_UART_RxCpltCallback
 	    if(HAL_UART_DMAStop(&huart1) ) //stop again to prevent errors
 	    {
 	      Error_Handler();
 	    }
-	    //__HAL_UART_DISABLE_IT(&huart1, UART_IT_IDLE);
-	   /* if (HAL_RS485Ex_Init(&huart1, UART_DE_POLARITY_HIGH, 0, 0) != HAL_OK)
-	    {
-	      Error_Handler();
-	    }*/
  	    if(HAL_UART_Receive_DMA(&huart1, (uint8_t *)UARTBuffer0, BUFSIZE) != HAL_OK) 	//Start receiving
  	    {
  	      Error_Handler();
  	    }
- 	   //__HAL_UART_CLEAR_IDLEFLAG(&huart1);
- 	   //__HAL_UART_ENABLE_IT(&huart1, UART_IT_IDLE); //Enable UART Idle interrupt
     }
 
 }

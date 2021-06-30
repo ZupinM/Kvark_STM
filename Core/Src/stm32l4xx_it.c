@@ -214,33 +214,24 @@ void DMA1_Channel4_IRQHandler(void)
   /* USER CODE END DMA1_Channel4_IRQn 0 */
   HAL_DMA_IRQHandler(&hdma_usart1_tx);
   /* USER CODE BEGIN DMA1_Channel4_IRQn 1 */
-
+  HAL_UART_DMAStop(&huart1);
   /* USER CODE END DMA1_Channel4_IRQn 1 */
 }
 
 /**
   * @brief This function handles USART1 global interrupt.
   */
-volatile int n_dbg;
 void USART1_IRQHandler(void)
 {
   /* USER CODE BEGIN USART1_IRQn 0 */
-	 n_dbg = 0;
-
 	if(__HAL_UART_GET_FLAG(&huart1, UART_FLAG_IDLE)){   // if Idle flag is set
 		HAL_UART_RxCpltCallback(&huart1);
 	}
-	else{
-		n_dbg = 1;
-
-  /* USER CODE END USART1_IRQn 0 */
-  /* USER CODE BEGIN USART1_IRQn 1 */
-	}
-	__HAL_UART_CLEAR_FEFLAG(&huart1);
 	__HAL_UART_CLEAR_FLAG(&huart1, 0xFFFFFFFF); //Clear all flags
+  /* USER CODE END USART1_IRQn 0 */
 	HAL_UART_IRQHandler(&huart1);
+  /* USER CODE BEGIN USART1_IRQn 1 */
 
-    (void) n_dbg ;
  	//__HAL_UART_CLEAR_OREFLAG(&huart1);
 	__HAL_UART_CLEAR_IDLEFLAG(&huart1);
 

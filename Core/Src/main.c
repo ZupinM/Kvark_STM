@@ -607,8 +607,9 @@ int main(void)
 	     //bldc_I(0);
 
 	     // MODBUS RS485
-	     if(modbus_newRequest() &&  (
-	       (__HAL_UART_GET_FLAG(&huart1, UART_FLAG_IDLE) && (uartMode == UART_MODE_RS485 || uartMode == UART_MODE_XBEE))))
+	     if(modbus_newRequest() &&  ((
+	    	huart1.gState != HAL_UART_STATE_BUSY && huart1.RxState != HAL_UART_STATE_BUSY_RX && //UART is IDLE
+	       (uartMode == UART_MODE_RS485 || uartMode == UART_MODE_XBEE))))
 	     {
 	       if((UARTBuffer0[0] == LoRa_id || UARTBuffer0[0] == slave_addr || UARTBuffer0[0] == 0)
 	           && uartMode == UART_MODE_RS485){
