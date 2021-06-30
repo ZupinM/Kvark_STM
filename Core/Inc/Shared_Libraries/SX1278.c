@@ -322,16 +322,16 @@ uint8_t LoRa_config(uint8_t channel, uint8_t power, uint8_t spFactor, uint8_t Lo
   for(volatile int i=0 ; i<720000 ; i++); //delay 15ms
 
   if(LoRa_BW == LoRa_BW_125KHZ)
-    module.frequency = 0x6C4666 + 0xC00 * channel;
+    module.frequency = LoRa_Frequency_MHzToF(433) + 0xC00 * channel; //start frequency = 430 MHz,  Channel step = 1.5 x BandWidth
 
   else if(LoRa_BW == LoRa_BW_250KHZ)
-    module.frequency = 0x6C4666 + 0x1800 * channel;
+    module.frequency = LoRa_Frequency_MHzToF(433) + 0x1800 * channel;
 
   else if(LoRa_BW == LoRa_BW_500KHZ)
-    module.frequency = 0x6C4666 + 0x3000 * channel;        
+    module.frequency = LoRa_Frequency_MHzToF(433) + 0x3000 * channel;
 
   else if(LoRa_BW == LoRa_BW_62_5KHZ)
-    module.frequency = 0x6C4666 + 0x600 * channel;
+    module.frequency = LoRa_Frequency_MHzToF(433) + 0x600 * channel;
 
   HAL_Delay(10);//debug
 

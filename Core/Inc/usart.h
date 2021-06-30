@@ -106,6 +106,9 @@ int modbus_discard2(void);
 int modbus_newRequest2(void);
 void modbus_ReqProcessed2(void);
 
+void reEnable_485_DMA_RX(void);
+void UART_ChangeBaudRate(int baud);
+
 void UART0ClearStatus(void);
 void UART1ClearStatus(void);
 void UART2ClearStatus(void);

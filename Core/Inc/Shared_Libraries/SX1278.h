@@ -60,6 +60,8 @@ extern uint8_t LoRa_route[165][MAX_ROUTE_HOPS];
 #define LoRa_IRQ_RxDone                 ( 1 << 6 )
 #define LoRa_IRQ_RxTimeout              ( 1 << 7 )
 
+#define LoRa_Frequency_MHzToF(f) (f* 524288 / 32 )
+
 //Error Coding rate (CR)setting
 #define LoRa_CR_4_5
 //#define LoRa_CR_4_6

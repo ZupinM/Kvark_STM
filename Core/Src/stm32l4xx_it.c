@@ -221,40 +221,28 @@ void DMA1_Channel4_IRQHandler(void)
 /**
   * @brief This function handles USART1 global interrupt.
   */
+volatile int n_dbg;
 void USART1_IRQHandler(void)
 {
   /* USER CODE BEGIN USART1_IRQn 0 */
+	 n_dbg = 0;
 
 	if(__HAL_UART_GET_FLAG(&huart1, UART_FLAG_IDLE)){   // if Idle flag is set
-		volatile uint32_t tmp;                  	// volatile to prevent optimizations
-		tmp = huart1.Instance->ISR;                  // Read status register and data reg to clear RX flag
-		tmp = huart1.Instance->RDR;
-		(void) tmp;									// only to not have the compiler warning (variable not used)
-
-
-	    //ModbusState0 |= MODBUS_PACKET_RECIVED;
-
-	    if(HAL_UART_DMAStop(&huart1) ) //sTOP receiving
-	    {
-	      Error_Handler();
-	    }
-	    if(HAL_UART_Receive_DMA(&huart1, (uint8_t *)UARTBuffer0, BUFSIZE) != HAL_OK) //Start receiving
-	    {
-	      Error_Handler();
-	    }
-
-	    //__HAL_UART_ENABLE_IT(&huart1, UART_IT_IDLE); //Enable UART Idle interrupt
-
-		//hdma_usart1_rx.Instance->CCR &= ~DMA_CCR_EN; // Disabling DMA will force transfer complete interrupt if enabled*/
+		HAL_UART_RxCpltCallback(&huart1);
 	}
 	else{
+		n_dbg = 1;
 
   /* USER CODE END USART1_IRQn 0 */
-  //HAL_UART_IRQHandler(&huart1);
   /* USER CODE BEGIN USART1_IRQn 1 */
 	}
+	__HAL_UART_CLEAR_FEFLAG(&huart1);
 	__HAL_UART_CLEAR_FLAG(&huart1, 0xFFFFFFFF); //Clear all flags
-	//__HAL_UART_CLEAR_IDLEFLAG(&huart1);
+	HAL_UART_IRQHandler(&huart1);
+
+    (void) n_dbg ;
+ 	//__HAL_UART_CLEAR_OREFLAG(&huart1);
+	__HAL_UART_CLEAR_IDLEFLAG(&huart1);
 
   /* USER CODE END USART1_IRQn 1 */
 }

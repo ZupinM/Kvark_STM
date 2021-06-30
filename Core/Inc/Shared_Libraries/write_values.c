@@ -251,11 +251,7 @@ void write_values(unsigned char box, unsigned int IntTemp, float FloatTemp, unsi
     case cbandwidth:            module.LoRa_BW = IntTemp; break;
 
     case cbaudrate:
-      huart2.Init.BaudRate = baudrate;
-      if (HAL_UART_Init(&huart2) != HAL_OK)
-      {
-        Error_Handler();
-      }
+      UART_ChangeBaudRate(baudrate);
       break;
 
     case cmotor_operation: {

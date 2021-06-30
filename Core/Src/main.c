@@ -466,6 +466,7 @@ int main(void)
   else{
     //NVIC_DisableIRQ(PIN_INT0_IRQn);
     transceiver = NONE;
+    uartMode = UART_MODE_RS485;
     LoRa_id = 116;  // default
   }
 
@@ -607,7 +608,7 @@ int main(void)
 
 	     // MODBUS RS485
 	     if(modbus_newRequest() &&  (
-	       (UART_CheckIdleState(&huart2) && (uartMode == UART_MODE_RS485 || uartMode == UART_MODE_XBEE))))
+	       (__HAL_UART_GET_FLAG(&huart1, UART_FLAG_IDLE) && (uartMode == UART_MODE_RS485 || uartMode == UART_MODE_XBEE))))
 	     {
 	       if((UARTBuffer0[0] == LoRa_id || UARTBuffer0[0] == slave_addr || UARTBuffer0[0] == 0)
 	           && uartMode == UART_MODE_RS485){
@@ -627,7 +628,8 @@ int main(void)
 	         modbus_ReqProcessed();      // re-enable reception
 	     }
 	     else if(modbus_newRequest() &&
-	       UART_CheckIdleState(&huart2) && uartMode == UART_MODE_XBEE)
+	        uartMode == UART_MODE_XBEE )
+			//&& UART_CheckIdleState(&huart1) )
 	     {
 	       modbus_cmd ();
 	       modbus_ReqProcessed();
@@ -709,14 +711,8 @@ int main(void)
 	          mode=MODE_SNOW;
 	        else mode = mode_normal;
 
-
-	     if(modbus_discard()) {
-	       if (uartMode == UART_MODE_RS485)
-	         UART0ClearStatus();
-	       else if (uartMode == UART_MODE_XBEE)
-	         UART1ClearStatus();
 	       modbus_ReqProcessed();
-	     }
+	       reEnable_485_DMA_RX();
 
 	     //rs485_RTS_timeout();
 
@@ -850,11 +846,7 @@ void auto_BaudRate(){
 
   if(transceiver != NONE) {
     if(baudrate == 115200){
-        huart2.Init.BaudRate = 19200;
-        if (HAL_UART_Init(&huart2) != HAL_OK)
-        {
-          Error_Handler();
-        }
+    	UART_ChangeBaudRate(19200);
     }
     return;
   }
@@ -867,11 +859,7 @@ void auto_BaudRate(){
       else{
         baudrate = 115200;
       }
-      huart2.Init.BaudRate = baudrate;
-      if (HAL_UART_Init(&huart2) != HAL_OK)
-      {
-        Error_Handler();
-      }
+      //UART_ChangeBaudRate(baudrate);
       baudrate_timeout = 1;
     }
 

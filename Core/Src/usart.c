@@ -76,7 +76,9 @@ void MX_USART1_UART_Init(void)
   huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
   huart1.Init.OverSampling = UART_OVERSAMPLING_16;
   huart1.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
-  huart1.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+  huart1.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_RXOVERRUNDISABLE_INIT|UART_ADVFEATURE_DMADISABLEONERROR_INIT;
+  huart1.AdvancedInit.OverrunDisable = UART_ADVFEATURE_OVERRUN_DISABLE;
+  huart1.AdvancedInit.DMADisableonRxError = UART_ADVFEATURE_DMA_DISABLEONRXERROR;
   if (HAL_RS485Ex_Init(&huart1, UART_DE_POLARITY_HIGH, 0, 0) != HAL_OK)
   {
     Error_Handler();
@@ -368,20 +370,20 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef *UartHandle)
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *UartHandle)
 {
-  /* Set transmission flag: transfer complete */
-	__HAL_UART_CLEAR_IDLEFLAG(&huart1);
+	volatile uint32_t tmp;                  	// volatile to prevent optimizations
+	tmp = huart1.Instance->ISR;                  // Read status register and data reg to clear RX flag
+	tmp = huart1.Instance->RDR;
+	(void) tmp;									// only to not have the compiler warning (variable not used)
+
+	UARTCount0 = BUFSIZE - __HAL_DMA_GET_COUNTER(&hdma_usart1_rx);
     ModbusState0 |= MODBUS_PACKET_RECIVED;
 
-    if(HAL_UART_DMAStop(&huart1) ) //sTOP receiving
+    if(HAL_UART_DMAStop(&huart1) ) //Stop receiving
     {
       Error_Handler();
     }
-    if(HAL_UART_Receive_DMA(&huart1, (uint8_t *)UARTBuffer0, BUFSIZE) != HAL_OK) //Start receiving
-    {
-      Error_Handler();
-    }
+    //Reception is re-enabled in main
 
-    __HAL_UART_ENABLE_IT(&huart1, UART_IT_IDLE); //Enable UART Idle interrupt
 }
 
 
@@ -454,10 +456,46 @@ void modbus_ReqProcessed()
   }
   else if (uartMode == UART_MODE_XBEE) {
     ModbusState1 &= MODBUS_CLEAR_MASK;
+
     UARTCount1 = 0;
   }
-
   //uartMode = UART_MODE_NONE;
+}
+
+void reEnable_485_DMA_RX(void){
+
+	if (huart1.RxState == HAL_UART_STATE_READY){										//Reenable reception, when DMA is stoped in HAL_UART_RxCpltCallback
+	    if(HAL_UART_DMAStop(&huart1) ) //stop again to prevent errors
+	    {
+	      Error_Handler();
+	    }
+	    //__HAL_UART_DISABLE_IT(&huart1, UART_IT_IDLE);
+	   /* if (HAL_RS485Ex_Init(&huart1, UART_DE_POLARITY_HIGH, 0, 0) != HAL_OK)
+	    {
+	      Error_Handler();
+	    }*/
+ 	    if(HAL_UART_Receive_DMA(&huart1, (uint8_t *)UARTBuffer0, BUFSIZE) != HAL_OK) 	//Start receiving
+ 	    {
+ 	      Error_Handler();
+ 	    }
+ 	   //__HAL_UART_CLEAR_IDLEFLAG(&huart1);
+ 	   //__HAL_UART_ENABLE_IT(&huart1, UART_IT_IDLE); //Enable UART Idle interrupt
+    }
+
+}
+
+void UART_ChangeBaudRate(int baud){
+	HAL_UART_DMAStop(&huart1);
+    HAL_UART_DeInit(&huart1);
+    huart1.Init.BaudRate = baud;
+    if (HAL_RS485Ex_Init(&huart1, UART_DE_POLARITY_HIGH, 0, 0) != HAL_OK)
+    {
+      Error_Handler();
+    }
+	if(HAL_UART_Receive_DMA(&huart1, (uint8_t *)UARTBuffer0, BUFSIZE) != HAL_OK) 	//Start receiving
+	{
+	  Error_Handler();
+	}
 }
 
 void modbus_ReqProcessed1()
