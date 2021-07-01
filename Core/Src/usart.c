@@ -265,7 +265,6 @@ void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle)
     /**USART3 GPIO Configuration
     PC4     ------> USART3_TX
     PC5     ------> USART3_RX
-    PD11     ------> USART3_CTS
     PD12     ------> USART3_RTS
     */
     GPIO_InitStruct.Pin = GPIO_PIN_4|GPIO_PIN_5;
@@ -275,7 +274,7 @@ void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle)
     GPIO_InitStruct.Alternate = GPIO_AF7_USART3;
     HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-    GPIO_InitStruct.Pin = LORA_DIO6_Pin|GPIO_PIN_12;
+    GPIO_InitStruct.Pin = GPIO_PIN_12;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
@@ -347,12 +346,11 @@ void HAL_UART_MspDeInit(UART_HandleTypeDef* uartHandle)
     /**USART3 GPIO Configuration
     PC4     ------> USART3_TX
     PC5     ------> USART3_RX
-    PD11     ------> USART3_CTS
     PD12     ------> USART3_RTS
     */
     HAL_GPIO_DeInit(GPIOC, GPIO_PIN_4|GPIO_PIN_5);
 
-    HAL_GPIO_DeInit(GPIOD, LORA_DIO6_Pin|GPIO_PIN_12);
+    HAL_GPIO_DeInit(GPIOD, GPIO_PIN_12);
 
   /* USER CODE BEGIN USART3_MspDeInit 1 */
 
