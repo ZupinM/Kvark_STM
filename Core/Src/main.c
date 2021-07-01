@@ -656,6 +656,7 @@ int main(void)
 				rxOffline_counter = 10000;
 				SPI_RxFifo_cmplt = 0;
 			}
+			get_LoRa_Status_DIO();
 	       if(lora_int_stat == TRANSMISSION_FINISHED)
 	         tx_finished();
 	       else if(lora_int_stat == PACKET_RECEIVED)

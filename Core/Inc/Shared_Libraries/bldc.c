@@ -309,7 +309,7 @@ void bldc_init_motors(int LoadDefaults)
       pid_bumpless(&bldc_motors[i].pid);
     }
 
-    bldc_status &= BLDC_LOCKED | BLDC_MOTOR_CUTOFF;
+    bldc_status &= ~(BLDC_LOCKED | BLDC_MOTOR_CUTOFF);
   }
 }
 
@@ -833,25 +833,25 @@ int bldc_HomeSwitchActive(unsigned char motor , unsigned char switch_h_l) {
   if (motor == 0){
 #if DEVICE != PICO
     if(!ES_0_normallyOpenLo && !switch_h_l)
-      return(~HAL_GPIO_ReadPin(END_SW_A_LO_GPIO_Port, END_SW_A_LO_Pin));
+      return(HAL_GPIO_ReadPin(END_SW_A_LO_GPIO_Port, END_SW_A_LO_Pin));
     else if(ES_0_normallyOpenLo && !switch_h_l)
-    	return(HAL_GPIO_ReadPin(END_SW_A_LO_GPIO_Port, END_SW_A_LO_Pin));
+    	return(!HAL_GPIO_ReadPin(END_SW_A_LO_GPIO_Port, END_SW_A_LO_Pin));
 #endif
     if(!ES_0_normallyOpenHi && switch_h_l)
-    	return(~HAL_GPIO_ReadPin(END_SW_A_HI_GPIO_Port, END_SW_A_HI_Pin));
+    	return(!HAL_GPIO_ReadPin(END_SW_A_HI_GPIO_Port, END_SW_A_HI_Pin));
     else if(ES_0_normallyOpenHi && switch_h_l)
     	return(HAL_GPIO_ReadPin(END_SW_A_HI_GPIO_Port, END_SW_A_HI_Pin));
   }
 #if DEVICE != PICO
   else if (motor == 1){
     if(!ES_1_normallyOpenLo && !switch_h_l)
-    	return(~HAL_GPIO_ReadPin(END_SW_A_LO_GPIO_Port, END_SW_A_LO_Pin));
+    	return(HAL_GPIO_ReadPin(END_SW_B_LO_GPIO_Port, END_SW_B_LO_Pin));
     else if(ES_1_normallyOpenLo && !switch_h_l)
-    	return(HAL_GPIO_ReadPin(END_SW_A_LO_GPIO_Port, END_SW_A_LO_Pin));
+    	return(!HAL_GPIO_ReadPin(END_SW_B_LO_GPIO_Port, END_SW_B_LO_Pin));
     else if(!ES_1_normallyOpenHi && switch_h_l)
-    	return(~HAL_GPIO_ReadPin(END_SW_A_HI_GPIO_Port, END_SW_A_HI_Pin));
+    	return(!HAL_GPIO_ReadPin(END_SW_B_HI_GPIO_Port, END_SW_B_HI_Pin));
     else if(ES_1_normallyOpenHi && switch_h_l)
-    	return(HAL_GPIO_ReadPin(END_SW_A_HI_GPIO_Port, END_SW_A_HI_Pin));
+    	return(HAL_GPIO_ReadPin(END_SW_B_HI_GPIO_Port, END_SW_B_HI_Pin));
   }
 #endif
   return 0;

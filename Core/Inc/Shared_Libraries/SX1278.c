@@ -100,6 +100,18 @@ void LoRa_TxPacket(uint8_t * txBuffer_, uint8_t length, uint32_t timeout) {
 
 }
 
+void get_LoRa_Status_DIO(void){
+	if(HAL_GPIO_ReadPin(LORA_DIO6_GPIO_Port, LORA_DIO6_Pin) && !lora_int_stat){
+	  if (transmission){
+	    lora_int_stat = TRANSMISSION_FINISHED;
+	    transmission = 0;
+	  }
+	  else{
+	    lora_int_stat = PACKET_RECEIVED;
+	  }
+	}
+}
+
 
 void tx_finished(void){
 

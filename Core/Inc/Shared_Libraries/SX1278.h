@@ -342,6 +342,7 @@ uint8_t lookup_second_packet_length(uint8_t cmd);
 void check_routing(void);
 uint8_t LoRa_get_rssi(void);
 
+void get_LoRa_Status_DIO(void);
 void tx_finished(void);
 void rx_finished(void);
 

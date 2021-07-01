@@ -104,7 +104,7 @@ extern uint8_t routeOrders[MAX_SLAVE_ADDR+1][MAX_ROUTE_HOPS];
 
 extern unsigned char any_motor_moving;
 
-#define ftoint(val) ((unsigned int)val)
+#define ftoint(val) (*((unsigned int *)(unsigned int) & (val))) 
 #define fsendval(val) (((ftoint(val) << 24) & 0xff000000) | ((ftoint(val) << 8) & 0xff0000) | ((ftoint(val) >> 24) & 0xff) | ((ftoint(val) >> 8) & 0xff00)) 
 char commShort = 1;
 char commBuff1;
@@ -2033,8 +2033,8 @@ void modbus_cmd_data2() {
 
 
 unsigned int FloatToUIntBytes(float val) {
-  unsigned int tmp = (unsigned int) val;
-  return tmp;
+	unsigned int tmp = *((unsigned int *)((unsigned int)&val));
+	return tmp;
 }
 
 /***********************************************************

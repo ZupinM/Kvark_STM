@@ -106,38 +106,38 @@ void MX_GPIO_Init(void)
   /*Configure GPIO pin : PtPin */
   GPIO_InitStruct.Pin = HALL_A1_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(HALL_A1_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : PBPin PBPin */
   GPIO_InitStruct.Pin = HALL_A2_Pin|HALL_B1_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
   /*Configure GPIO pin : PtPin */
   GPIO_InitStruct.Pin = HALL_A3_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(HALL_A3_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : PDPin PDPin */
   GPIO_InitStruct.Pin = HALL_B3_Pin|HALL_B2_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
 
   /*Configure GPIO pins : PDPin PDPin PDPin */
-  GPIO_InitStruct.Pin = END_SW_A_LO_Pin|END_SW_A_HI_Pin|END_SW_B_HI_Pin;
+  GPIO_InitStruct.Pin = END_SW_A_LO_Pin|BT1_Pin|BT2_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : PDPin PDPin */
+  GPIO_InitStruct.Pin = END_SW_A_HI_Pin|END_SW_B_HI_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : PtPin */
-  GPIO_InitStruct.Pin = LORA_DIO6_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(LORA_DIO6_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : PtPin */
   GPIO_InitStruct.Pin = LED_RD_Pin;
@@ -149,14 +149,8 @@ void MX_GPIO_Init(void)
   /*Configure GPIO pin : PtPin */
   GPIO_InitStruct.Pin = END_SW_B_LO_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(END_SW_B_LO_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pins : PDPin PDPin */
-  GPIO_InitStruct.Pin = BT1_Pin|BT2_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
-  HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+  HAL_GPIO_Init(END_SW_B_LO_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : PtPin */
   GPIO_InitStruct.Pin = BOOT_Pin;
@@ -200,20 +194,22 @@ void set_LED(uint8_t color, uint8_t state, uint16_t timeout){
 	}
 
 	if((LEDStates & 1<<RED) != (LEDStates_old & 1<<RED)){
-		HAL_GPIO_WritePin(LED_RD_GPIO_Port, LED_RD_Pin, !(LEDStates & 1<<RED) );
+		HAL_GPIO_WritePin(LED_RD_GPIO_Port, LED_RD_Pin, (LEDStates & 1<<RED ? GPIO_PIN_RESET : GPIO_PIN_SET) );
 	}
 	if((LEDStates & 1<<GREEN) != (LEDStates_old & 1<<GREEN)){
-		HAL_GPIO_WritePin(LED_GR_GPIO_Port, LED_GR_Pin, !(LEDStates & 1<<GREEN) );
+		HAL_GPIO_WritePin(LED_GR_GPIO_Port, LED_GR_Pin, (LEDStates & 1<<GREEN ? GPIO_PIN_RESET : GPIO_PIN_SET) );
 	}
 	if((LEDStates & 1<<BLUE) != (LEDStates_old & 1<<BLUE)){
-		HAL_GPIO_WritePin(LED_BL_GPIO_Port, LED_BL_Pin, !(LEDStates & 1<<BLUE) );
+		HAL_GPIO_WritePin(LED_BL_GPIO_Port, LED_BL_Pin, (LEDStates & 1<<BLUE ? GPIO_PIN_RESET : GPIO_PIN_SET) );
 	}
 
 	if((LEDStates & 1<<WHITE) != (LEDStates_old & 1<<WHITE)){
-		HAL_GPIO_WritePin(LED_RD_GPIO_Port, LED_RD_Pin, !(LEDStates & 1<<WHITE) );
-		HAL_GPIO_WritePin(LED_GR_GPIO_Port, LED_GR_Pin, !(LEDStates & 1<<WHITE) );
-		HAL_GPIO_WritePin(LED_BL_GPIO_Port, LED_BL_Pin, !(LEDStates & 1<<WHITE) );
+		HAL_GPIO_WritePin(LED_RD_GPIO_Port, LED_RD_Pin, (LEDStates & 1<<WHITE ? GPIO_PIN_RESET : GPIO_PIN_SET) );
+		HAL_GPIO_WritePin(LED_GR_GPIO_Port, LED_GR_Pin, (LEDStates & 1<<WHITE ? GPIO_PIN_RESET : GPIO_PIN_SET) );
+		HAL_GPIO_WritePin(LED_BL_GPIO_Port, LED_BL_Pin, (LEDStates & 1<<WHITE ? GPIO_PIN_RESET : GPIO_PIN_SET) );
 	}
+
+	LEDStates_old = LEDStates;
 
 }
 
@@ -243,13 +239,7 @@ void HallVoltage(){
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
 	if(GPIO_Pin == LORA_DIO6_Pin){
-	  if (transmission){
-	    lora_int_stat = TRANSMISSION_FINISHED;
-	    transmission = 0;
-	  }
-	  else{
-	    lora_int_stat = PACKET_RECEIVED;
-	  }
+
 	}
 }
 

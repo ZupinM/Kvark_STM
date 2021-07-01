@@ -229,7 +229,7 @@ void USART1_IRQHandler(void)
 	}
 	__HAL_UART_CLEAR_FLAG(&huart1, 0xFFFFFFFF); //Clear all flags
   /* USER CODE END USART1_IRQn 0 */
-	HAL_UART_IRQHandler(&huart1);
+  HAL_UART_IRQHandler(&huart1);
   /* USER CODE BEGIN USART1_IRQn 1 */
 
  	//__HAL_UART_CLEAR_OREFLAG(&huart1);
@@ -247,7 +247,6 @@ void EXTI15_10_IRQHandler(void)
 
   /* USER CODE END EXTI15_10_IRQn 0 */
   HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_10);
-  HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_11);
   HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_12);
   HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_15);
   /* USER CODE BEGIN EXTI15_10_IRQn 1 */
