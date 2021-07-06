@@ -152,7 +152,6 @@ float MOTOR_START_VOLTAGE;
 float UNDERVOLTAGE_LEVEL;
 float MOTOR_CUTOF_LEVEL; 
 
-extern float bldc_Current;   
 
 bldc_misc  bldc_cfg;
 bldc_motor bldc_motors[BLDC_MOTOR_COUNT];            //motors
@@ -375,7 +374,7 @@ void bldc_Lock(int state) {
 
 void Enable_ChargePump(uint8_t state){
   if(state == 1){
-	  HAL_TIM_MspPostInit(&hChargePumpTIM);
+	  HAL_TIM_PWM_MspInit(&hChargePumpTIM);
   }else{
 	  HAL_TIM_PWM_MspDeInit(&hChargePumpTIM);
   }
@@ -810,20 +809,9 @@ uint32_t s_time = 0;
 
 void bldc_update_pwm(unsigned short value) {
   /* Set the pulse value for channel 1, 2, 3 */
-  TIM_OC_InitTypeDef sConfigOC = {0};
-  sConfigOC.Pulse = value;
-  if (HAL_TIM_PWM_ConfigChannel(&htim1, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
-  {
-	Error_Handler();
-  }
-  if (HAL_TIM_PWM_ConfigChannel(&htim1, &sConfigOC, TIM_CHANNEL_2) != HAL_OK)
-  {
-	Error_Handler();
-  }
-  if (HAL_TIM_PWM_ConfigChannel(&htim1, &sConfigOC, TIM_CHANNEL_3) != HAL_OK)
-  {
-	Error_Handler();
-  }
+  __HAL_TIM_SetCompare (&htim1, TIM_CHANNEL_1, value);
+  __HAL_TIM_SetCompare (&htim1, TIM_CHANNEL_2, value);
+  __HAL_TIM_SetCompare (&htim1, TIM_CHANNEL_3, value);
 }
 
 
@@ -862,7 +850,7 @@ unsigned char OldState;
 
 
 #define MODE_OUTPUT 0x01
-#define MODE_ALTERNATE  0x10
+#define MODE_ALTERNATE  0x02
 
 void setGPIO_Function(GPIO_TypeDef  *GPIOx, uint16_t GPIO_Pin, uint8_t mode){
 	uint32_t temp = GPIOx->MODER;
@@ -882,7 +870,7 @@ void bldc_SetDrivers(unsigned char NewState, unsigned char motor){
 
 
   if(motor==1){
-  #ifdef MOTOR_B_LO1_PORT
+#if DEVICE != PICO
 
 	    //disable low side
 	    if(!(NewState & BLDC_PA_NEG))
@@ -931,9 +919,9 @@ void bldc_SetDrivers(unsigned char NewState, unsigned char motor){
 	      case BLDC_PB_NEG:
 	    	  HAL_GPIO_WritePin(MOTOR_B_2L_GPIO_Port, MOTOR_B_2L_Pin, GPIO_PIN_SET); phase_active++; break;// A L L2
 	      case BLDC_PC_NEG:
-	    	  HAL_GPIO_WritePin(MOTOR_B_2L_GPIO_Port, MOTOR_B_2L_Pin, GPIO_PIN_SET); phase_active++; break;// A L L3
+	    	  HAL_GPIO_WritePin(MOTOR_B_3L_GPIO_Port, MOTOR_B_3L_Pin, GPIO_PIN_SET); phase_active++; break;// A L L3
 	    }
-   #endif
+#endif
    }
 
   else if (motor == 0){
@@ -985,7 +973,7 @@ void bldc_SetDrivers(unsigned char NewState, unsigned char motor){
       case BLDC_PB_NEG:
     	  HAL_GPIO_WritePin(MOTOR_A_2L_GPIO_Port, MOTOR_A_2L_Pin, GPIO_PIN_SET); phase_active++; break;// A L L2
       case BLDC_PC_NEG:
-    	  HAL_GPIO_WritePin(MOTOR_A_2L_GPIO_Port, MOTOR_A_2L_Pin, GPIO_PIN_SET); phase_active++; break;// A L L3
+    	  HAL_GPIO_WritePin(MOTOR_A_3L_GPIO_Port, MOTOR_A_3L_Pin, GPIO_PIN_SET); phase_active++; break;// A L L3
     }
   }
 
@@ -1859,6 +1847,23 @@ void dc_Comutate(unsigned char motor, unsigned char state) {
 
   bldc_motors[motor].hall_state = state; //save state
 
+}
+
+
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+	if(GPIO_Pin == HALL_A1_Pin || GPIO_Pin == HALL_A2_Pin || GPIO_Pin == HALL_A3_Pin ){
+		  if (!(bldc_motors[0].state & BLDC_MOTOR_STATE_DC_OPERATION))
+		    bldc_Comutate(0);
+		  else
+		    dc_Comutate(0, bldc_ReadHall(0));
+	}
+	else if(GPIO_Pin == HALL_B1_Pin || GPIO_Pin == HALL_B2_Pin || GPIO_Pin == HALL_B3_Pin ){
+		  if (!(bldc_motors[1].state & BLDC_MOTOR_STATE_DC_OPERATION))
+		    bldc_Comutate(1);
+		  else
+		    dc_Comutate(1, bldc_ReadHall(1));
+	}
 }
 /*
 // HALL Interrupts

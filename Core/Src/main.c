@@ -109,8 +109,6 @@ float err_voltageB;
 
 extern float bldc_pwm;
 
-float bldc_Current;
-
 unsigned int tracker_status;			//status kondicije, v kateri je tracker (napake, halli...)
 unsigned int tracker_exstatus;
 uint8_t slave_addr;			//slave address on RS485
@@ -484,6 +482,10 @@ int main(void)
   //unsigned int countRsRx = 0;
   SEGGER_RTT_ConfigUpBuffer(0, NULL, NULL, 0, SEGGER_RTT_MODE_NO_BLOCK_SKIP);
   flags &= ~(1 << reset_it);  // do not reset for begin
+
+
+  //setGPIO_Function(MOTOR_A_1H_GPIO_Port, MOTOR_A_1H_Pin, MODE_ALTERNATE);
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -691,18 +693,18 @@ int main(void)
 	       rxOffline_counter --;
 
 	     } else {  ////////////////////Sigma disconected, timeout  -> set mode micro tracking or manual
-	       sigma_just_connected = 0;
-	       if (mode == MODE_SLAVE){
-	         mode = MODE_OK;
-	         bldc_EnableMotor(0,1);
-	         bldc_EnableMotor(1,1); //Enable disabled states in sigma
-	       }
-	       else if(mode == MODE_SLAVE_TRACKING){
-	         mode = MODE_MICRO;
-	         bflags|=(1<<time_enable);
-	         no_run_time=0;
-	         Recalc_sun();
-	         }
+			   sigma_just_connected = 0;
+			   if (mode == MODE_SLAVE){
+				 mode = MODE_OK;
+				 bldc_EnableMotor(0,1);
+				 bldc_EnableMotor(1,1); //Enable disabled states in sigma
+			   }
+			   else if(mode == MODE_SLAVE_TRACKING){
+				 mode = MODE_MICRO;
+				 bflags|=(1<<time_enable);
+				 no_run_time=0;
+				 Recalc_sun();
+			   }
 	      }
 
 	       if (mode != MODE_WIND && mode != MODE_SNOW)
@@ -1320,7 +1322,7 @@ void Measure_Line_Resistance() {
   RMessure_AvgU = (RMessure_AvgU+GetAnalogValues(SUPPLY)) / 2;
   if (MotorAisMoving() || MotorBisMoving()) {
     if (RMesTimer >= 3000) {
-      LineResistance = (RMessure_StartU - GetAnalogValues(SUPPLY)) / bldc_Current;
+      LineResistance = (RMessure_StartU - GetAnalogValues(SUPPLY)) / GetAnalogValues(MotorSelectI(bldc_cm->index));
       if (LineResistance > max_line_resistance) {
 	tracker_exstatus |= EFS_LINE_RESISTANCE_HIGH;
       }

@@ -38,8 +38,13 @@ extern TIM_HandleTypeDef htim16;
 /* USER CODE BEGIN Private defines */
 extern TIM_HandleTypeDef hChargePumpTIM;
 
+#undef  CHARGE_PUMP_PERIOD
+#undef  CHARGE_PUMP_PULSE
+#undef  MOTOR_PWM_PERIOD
 #define CHARGE_PUMP_PERIOD  ((uint32_t)(SystemCoreClock / 5000) - 1) /*!< 5kHz  */
+#define CHARGE_PUMP_PULSE  ((uint32_t)((SystemCoreClock / 5000) - 1) / 2 )
 #define MOTOR_PWM_FREQUENCY 10000 //10kHz  //Old Kvark was 4kHz
+#define MOTOR_PWM_PERIOD (SystemCoreClock / TIM1_PRESCALER / MOTOR_PWM_FREQUENCY)
 /* USER CODE END Private defines */
 
 void MX_TIM1_Init(void);

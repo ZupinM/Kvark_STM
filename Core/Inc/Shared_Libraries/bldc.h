@@ -51,6 +51,8 @@ typedef struct{
   unsigned int  homing_timeout;
 }bldc_misc;
 
+extern bldc_motor *bldc_cm;
+
 
 #define BLDC_MOTOR_STATE_ENABLED (1<<0)
 #define BLDC_MOTOR_STATE_INVERT_DIRECTION  (1<<1)

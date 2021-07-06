@@ -38,7 +38,6 @@ extern unsigned int sigma_just_connected;
 extern float           LineResistance;
 
 extern uint8_t usb_drive;
-extern float bldc_Current;
 extern uint8_t voltage_select;
 extern float UVccHALL_0, UVccHALL_1;
 #if (DEVICE == KVARK || DEVICE == PICO)
@@ -281,7 +280,7 @@ void modbus_cmd() {
         }
         // IMOTOR
         case MCMD_R_Imotor: {					   
-          number_TX_bytes0 = mcmd_read_float(bldc_Current, (char *)UARTBuffer0);
+          number_TX_bytes0 = mcmd_read_float(GetAnalogValues(MotorSelectI(bldc_cm->index)), (char *)UARTBuffer0);
           break;
         }
 
@@ -1190,7 +1189,7 @@ void modbus_cmd() {
           //read_int_buf[6]=0;
 
           read_int_buf[7]=FloatToUIntBytes(GetAnalogValues(SUPPLY));
-          read_int_buf[8]=FloatToUIntBytes(bldc_Current);
+          read_int_buf[8]=FloatToUIntBytes(GetAnalogValues(MotorSelectI(bldc_cm->index)));
 
           read_int_buf[9]=FloatToUIntBytes (bldc_remaining(0));
           read_int_buf[10]=FloatToUIntBytes(bldc_position(0));
