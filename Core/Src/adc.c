@@ -140,8 +140,10 @@ void MX_ADC1_Init(void)
   }
   /* USER CODE BEGIN ADC1_Init 2 */
 
-  HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED);
-
+  if(HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED) != HAL_OK)
+  {
+    Error_Handler();
+  }
   /* USER CODE END ADC1_Init 2 */
 
 }
@@ -249,31 +251,44 @@ uint32_t BatteryMeas_cnt = 100000;
 uint32_t ADCBatteryVoltage;
 
 void StartADC_DMA_Sequence(void){
+	if(HAL_ADC_Stop_DMA(&hadc1) != HAL_OK)
+	{
+		Error_Handler();
+	}
 	//HAL_DMA_Abort(&hdma_adc1);  // Reset DMA destination address
 	  if(BatteryMeas_cnt++ > 100000){ //Measure battery voltage ~once per 20s
 		  BatteryMeas_cnt = 0;
 		  SetADC_BatteryMeas();
-		  HAL_ADC_Start_DMA(&hadc1, g_ADCBuffer, 1);
+		  if(HAL_ADC_Start_DMA(&hadc1, g_ADCBuffer, 1) != HAL_OK)
+		  {
+			  Error_Handler();
+		  }
 		  return;
 	  }else if(BatteryMeas_cnt == 1){
 		  ADCBatteryVoltage = g_ADCBuffer[0];
 		  ClearADC_BatteryMeas();
 	  }
-	HAL_ADC_Start_DMA(&hadc1, g_ADCBuffer, ADC_BUFFER_LENGTH);
+	if(HAL_ADC_Start_DMA(&hadc1, g_ADCBuffer, ADC_BUFFER_LENGTH) != HAL_OK)
+	{
+		Error_Handler();
+	}
 
 }
 
 void ClearADC_BatteryMeas(void){
-	  HAL_ADC_Stop_DMA(&hadc1);
-	  HAL_ADC_DeInit(&hadc1);
-	  MX_ADC1_Init();
+
+	if(HAL_ADC_DeInit(&hadc1) != HAL_OK)
+	{
+		Error_Handler();
+	}
+	MX_ADC1_Init();
 
 }
 void SetADC_BatteryMeas(void){
 
-	  HAL_ADC_Stop_DMA(&hadc1);
-	  HAL_ADC_DeInit(&hadc1);
-
+	  if(HAL_ADC_DeInit(&hadc1) != HAL_OK){
+		  Error_Handler();
+  	  }
 	  hadc1.Init.OversamplingMode = DISABLE;
 	  if (HAL_ADC_Init(&hadc1) != HAL_OK)
 	  {
@@ -287,7 +302,10 @@ void SetADC_BatteryMeas(void){
 	  {
 	    Error_Handler();
 	  }
-	  HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED);
+	  if (HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED) != HAL_OK)
+	  {
+	    Error_Handler();
+	  }
 
 }
 
@@ -341,14 +359,14 @@ float GetAnalogValues(unsigned char measuring_point) {
     case TEMPERATURE:
       return __HAL_ADC_CALC_TEMPERATURE(TempAvg, 3300, ADC_RESOLUTION12b);
     case CURRENT_A:
-    	return (float)Iavg_A / (bldc_cfg.IConvertRatio * 5);
+    	return (float)Iavg_A / (bldc_cfg.IConvertRatio * 152);
     case CURRENT_A_UNFILTERED:
-    	return (float)g_ADCBuffer[2] / (bldc_cfg.IConvertRatio * 5);
+    	return (float)g_ADCBuffer[2] / (bldc_cfg.IConvertRatio * 152);
 #if DEVICE == KVARK
     case CURRENT_B:
-    	return (float)Iavg_B / (bldc_cfg.IConvertRatio * 5);
+    	return (float)Iavg_B / (bldc_cfg.IConvertRatio * 152);
     case CURRENT_B_UNFILTERED:
-    	return (float)g_ADCBuffer[4] / (bldc_cfg.IConvertRatio * 5);
+    	return (float)g_ADCBuffer[4] / (bldc_cfg.IConvertRatio * 152);
 #endif
 #if DEVICE != PICO
     case HALL :
