@@ -1074,6 +1074,16 @@ void ClearStatus() {
   tracker_status &= ~(0xff | SF_HALL_WIRING_A | SF_HALL_WIRING_B | SYS_PARAM_FLASH_ERR | SF_POWER_FAILURE | SF_MOVING_OUT_A | SF_MOVING_IN_A | SF_MOVING_REF_CLR_A | SF_ENDSW_A_LO_PRESSED | SF_ENDSW_A_HI_PRESSED | SF_MOVING_OUT_B | SF_MOVING_IN_B | SF_MOVING_REF_CLR_B | SF_ENDSW_B_LO_PRESSED | SF_ENDSW_B_HI_PRESSED);			//brisi zastavice
   tracker_exstatus &= ~EFS_ERROR_CLEAR;
   bldc_ClearStatus();
+  //void ClearStatus (void) {
+  //
+  //    tracker_status  = 0;			//brisi zastavice
+  //    H_direrror      = 0;
+  //    V_direrror      = 0;
+   //   motor_clear_status();
+      focus_restart();
+      backup_timeout=BACKUP_TO;		//4 sekunde zatem backup v flash
+      flags&=~(1<<Modbus_timeout);
+  //}
 }
 
 /***********************************************************

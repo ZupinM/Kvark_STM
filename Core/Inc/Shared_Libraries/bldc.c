@@ -1348,16 +1348,16 @@ void bldc_process() {
   //****end switch error detection****
   if(bldc_HomeSwitchActive(bldc_cm->index,0) && bldc_cm->ctrl == BLDC_CTRL_TRACKING && bldc_cm->position > bldc_position_to_pulses(bldc_cm->index, bldc_cm->end_switchDetect - 0.1)){
     SetEventParameters(bldc_cm->index);
-    ActivateDrivers(0);
+    //ActivateDrivers(0);
     bldc_cm->status|= BLDC_STATUS_ENDSWITCH_ERROR;
-    return;
+    //return;
   }
 
-  if(bldc_HomeSwitchActive(bldc_cm->index,1) && bldc_cm->ctrl == BLDC_CTRL_TRACKING && bldc_cm->position > bldc_position_to_pulses(bldc_cm->index, bldc_cm->end_switchDetect - 0.1)){
+  if(bldc_HomeSwitchActive(bldc_cm->index,1) && bldc_cm->ctrl == BLDC_CTRL_TRACKING && bldc_cm->position <  bldc_position_to_pulses(bldc_cm->index, (bldc_cm->max_position -bldc_cm->end_switchDetect - 0.1)) ){
     SetEventParameters(bldc_cm->index);
-    ActivateDrivers(0);
+    //ActivateDrivers(0);
     bldc_cm->status|= BLDC_STATUS_ENDSWITCH_ERROR;
-    return;
+    //return;
   }
     
   //****end switch detection****
@@ -1370,6 +1370,20 @@ void bldc_process() {
      bldc_manual(1);
     bldc_Stop(1);
     bldc_runout(RUNOUT_ACTIVATE);
+    return;
+  }
+
+  if(bldc_HomeSwitchActive(bldc_cm->index,0) && bldc_cm->target < bldc_cm->position){
+    bldc_cm->target = bldc_cm->position;
+    bldc_cm->ctrl = BLDC_CTRL_STOP;
+    ActivateDrivers(0);
+    return;
+  }
+
+  if(bldc_HomeSwitchActive(bldc_cm->index,1) && bldc_cm->target > bldc_cm->position){
+    bldc_cm->target = bldc_cm->position;
+    bldc_cm->ctrl = BLDC_CTRL_STOP;
+    ActivateDrivers(0);
     return;
   }
 
@@ -1407,20 +1421,6 @@ void bldc_process() {
   }
   //*************************************************************
 
-
-//  if(bldc_HomeSwitchActive(bldc_cm->index,0) && bldc_cm->target < bldc_cm->position){
-//    bldc_cm->target = bldc_cm->position;
-//    bldc_cm->ctrl = BLDC_CTRL_STOP;
-//    ActivateDrivers(0);
-//    return;
-//  }
-//
-//    if(bldc_HomeSwitchActive(bldc_cm->index,1) && bldc_cm->target > bldc_cm->position){
-//    bldc_cm->target = bldc_cm->position;
-//    bldc_cm->ctrl = BLDC_CTRL_STOP;
-//    ActivateDrivers(0);
-//    return;
-//  }
 
   // Homing timeout
   if(bldc_cm->ctrl == BLDC_CTRL_HOMING && bldc_cm->homing_time >= (bldc_cfg.homing_timeout * 1000)) {
