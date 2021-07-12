@@ -132,8 +132,6 @@ extern int WindCnt;
 
 unsigned char ButtonStatus;
 
-extern float battery_voltage;
-
  extern unsigned char pcb_version1;                //TIV           27   27C1=0x1B 0x43 0x01 .... 0x1B=27 0x43='C' 0x01=1 .... vpisi 0x1B4301 oziroma 1786625
  extern char pcb_version2;                         //verzija TIVa  C
  extern unsigned char pcb_version3;                //TIV polaganje 1
@@ -174,6 +172,7 @@ extern bldc_motor *bldc_cm;
 
 unsigned int reset_status;
 volatile unsigned int start_count = 0;
+uint8_t init_main_state = 1;
 
 extern volatile unsigned int number_of_poles;
 
@@ -440,9 +439,9 @@ int main(void)
   bldc_init(LoadDefaults);
 
   //button stuck detection
-  if (ButtonStates())
+  if (ButtonStates()){
     tracker_exstatus |= EFS_BUTTON_STUCK;
-
+  }
   //wait until valid voltage
   int USB_power_delay = 0;
   while(GetAnalogValues(SUPPLY) < SHUTDOWN_VOLTAGE) {
@@ -490,6 +489,7 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+  init_main_state = 0;
   while (1)
   {
 	  if(bldc_Status() & BLDC_SHUTTING_DOWN) {
@@ -502,18 +502,6 @@ int main(void)
 
 	     //SEGGER_RTT_printf(0, "main period:%d\r\n", systick_count -systick_count_prev);
 	     //systick_count_prev = systick_count;
-
-	     /*// reset bit RS485 TX (data flow RS485)
-	     if (uartMode == UART_MODE_RS485) {
-	       if(((LPC_GPIO_PORT->PIN[0] & (1 << 28)) >> 28) == 1) {
-	         countRsRx++;
-	         if(countRsRx > 10000) {
-	           LPC_GPIO_PORT->CLR[0] |= (1 << 28);
-	         }
-	       }
-	       else
-	         countRsRx = 0;
-	     }*/
 
 	     // reset before upgrade
 	     if(delay_reset > 0) {
@@ -718,8 +706,6 @@ int main(void)
 	       modbus_ReqProcessed();
 	       reEnable_485_DMA_RX();
 
-	     //rs485_RTS_timeout();
-
 	     //Measure_Line_Resistance();
 
 	     // modbus comunication lost
@@ -836,10 +822,11 @@ void bindMode_check(){
     ButtonStatus = 0;
   }
   if(LoRa_bindMode_slave){
-    if(LoRa_channel_received){
+    if(LoRa_channel_received || ButtonStatus & (1<<2)){
       //LoRa_channel_received = 0;
       LoRa_bindMode_master = 0;
       LoRa_Bind_Mode(BIND_EXIT);
+      ButtonStatus = 0;
     }
   }
 }
@@ -1004,7 +991,7 @@ void StatusUpdate() {
   else
     tracker_exstatus &=~ ESF_MOVE_OUT_ERR_A;
 
-  if(battery_voltage < 2.4)
+  if(GetAnalogValues(BATTERY) < 2.4)
     tracker_exstatus |= EFS_BATTERY_LOW;
   else
     tracker_exstatus &= ~EFS_BATTERY_LOW;
@@ -1071,7 +1058,7 @@ void StatusUpdate() {
 void ClearStatus() {
   crc_errors       = 0;
   tracker_status = 0;
-  tracker_status &= ~(0xff | SF_HALL_WIRING_A | SF_HALL_WIRING_B | SYS_PARAM_FLASH_ERR | SF_POWER_FAILURE | SF_MOVING_OUT_A | SF_MOVING_IN_A | SF_MOVING_REF_CLR_A | SF_ENDSW_A_LO_PRESSED | SF_ENDSW_A_HI_PRESSED | SF_MOVING_OUT_B | SF_MOVING_IN_B | SF_MOVING_REF_CLR_B | SF_ENDSW_B_LO_PRESSED | SF_ENDSW_B_HI_PRESSED);			//brisi zastavice
+  tracker_status &= ~(0xff | SF_HALL_WIRING_A | SF_HALL_WIRING_B | SYS_PARAM_FLASH_ERR | SF_POWER_FAILURE | SF_MOVING_OUT_A | SF_MOVING_IN_A | SF_MOVING_REF_CLR_A | SF_ENDSW_A_LO_PRESSED | SF_ENDSW_A_HI_PRESSED | SF_MOVING_OUT_B | SF_MOVING_IN_B | SF_MOVING_REF_CLR_B | SF_ENDSW_B_LO_PRESSED | SF_ENDSW_B_HI_PRESSED | SF_NO_MODBUS);			//brisi zastavice
   tracker_exstatus &= ~EFS_ERROR_CLEAR;
   bldc_ClearStatus();
   //void ClearStatus (void) {

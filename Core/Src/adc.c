@@ -25,6 +25,7 @@
 uint32_t g_ADCBuffer[ADC_BUFFER_LENGTH];
 extern bldc_motor bldc_motors[BLDC_MOTOR_COUNT];
 extern bldc_misc  bldc_cfg;
+uint32_t ADC_calibration_value;
 
 /* USER CODE END 0 */
 
@@ -139,10 +140,17 @@ void MX_ADC1_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN ADC1_Init 2 */
-
-  if(HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED) != HAL_OK)
+  if(init_main_state)
   {
-    Error_Handler();
+	  if(HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED) != HAL_OK)
+	  {
+		Error_Handler();
+	  }
+	  ADC_calibration_value = LL_ADC_GetCalibrationFactor(hadc1.Instance, ADC_SINGLE_ENDED);
+  }
+  else
+  {
+	  LL_ADC_SetCalibrationFactor(hadc1.Instance, ADC_SINGLE_ENDED, ADC_calibration_value);
   }
   /* USER CODE END ADC1_Init 2 */
 
@@ -302,10 +310,7 @@ void SetADC_BatteryMeas(void){
 	  {
 	    Error_Handler();
 	  }
-	  if (HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED) != HAL_OK)
-	  {
-	    Error_Handler();
-	  }
+	  LL_ADC_SetCalibrationFactor(hadc1.Instance, ADC_SINGLE_ENDED, ADC_calibration_value);
 
 }
 
@@ -351,11 +356,11 @@ float GetAnalogValues(unsigned char measuring_point) {
 
   switch(measuring_point){
     case SUPPLY :
-      return (float)Uavg  / (bldc_cfg.UConvertRatio * 64);
+      return (float)Uavg  / (bldc_cfg.UConvertRatio * 64.2);
     case SUPPLY_UNFILTERED :
-      return (float)g_ADCBuffer[1] / (bldc_cfg.UConvertRatio * 64);
+      return (float)g_ADCBuffer[1] / (bldc_cfg.UConvertRatio * 64.2);
     case BATTERY :
-    	return (float)ADCBatteryVoltage / 352;
+    	return (float)ADCBatteryVoltage / 330;
     case TEMPERATURE:
       return __HAL_ADC_CALC_TEMPERATURE(TempAvg, 3300, ADC_RESOLUTION12b);
     case CURRENT_A:

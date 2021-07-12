@@ -106,7 +106,6 @@ float         zeroCurrent_voltage_1;
 
 float UVccHALL_0, UVccHALL_1;
 float UVccHALL_0_avg, UVccHALL_1_avg;
-float battery_voltage = 3;
 float temperature;
 
 
@@ -416,8 +415,8 @@ void bldc_ReleaseDrivers() {
 void bldc_ClearStatus() {
   bldc_status &= ~(BLDC_MOTOR_CUTOFF | BLDC_VOLTAGE_TO_LOW);
   for(int i = 0; i < BLDC_MOTOR_COUNT; i++){
-    //bldc_motors[i].status &= ~BLDC_STATUS_CLEARMASK;
-    bldc_motors[i].status = 0;
+    bldc_motors[i].status &= ~BLDC_STATUS_CLEARMASK;
+    //bldc_motors[i].status = 0;
     bldc_motors[i].i_err_cnt = 0;
     bldc_EnableMotor(i,1);
     //bldc_Stop(1);

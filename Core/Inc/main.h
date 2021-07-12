@@ -70,6 +70,7 @@ extern volatile int delay_reset;
 extern unsigned int backup_timeout;
 extern volatile unsigned int bldc_Speed;
 extern unsigned int store_in_flash;
+extern uint8_t init_main_state;
 
 extern volatile uint8_t UARTBuffer0[BUFSIZE];
 extern unsigned char uartMode;
