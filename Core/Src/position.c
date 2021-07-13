@@ -17,7 +17,9 @@ int HallCnt1A, HallCnt1B, HallCnt2A, HallCnt2B;
 #include "position.h"
 #include "main.h"
 #include "gpio.h"
+#include "Shared_Libraries/bldc.h"
 #include "adc.h"
+#include "tim.h"
 #include "RTT/SEGGER_RTT.h"
 #include <stdlib.h>
 
@@ -44,30 +46,24 @@ extern unsigned int speedB;
 extern unsigned int hall_enable; // bitwise A motor: bits 0, 1; B motor: bits 16, 17.
 extern unsigned int error_hall_A;
 extern unsigned int error_hall_B;
-extern unsigned int A_enc_new;
-extern unsigned int A_enc_old;
-extern unsigned int A_enc_temp;
-extern unsigned int B_enc_new;
-extern unsigned int B_enc_old;
-extern unsigned int B_enc_temp;
+unsigned int A_enc_new;
+unsigned int A_enc_old;
+unsigned int A_enc_temp;
+unsigned int B_enc_new;
+unsigned int B_enc_old;
+unsigned int B_enc_temp;
 extern unsigned int Hall_CntDown; 
 extern volatile signed int position_A;
 extern volatile signed int position_B;
-extern char first_movingA;
-extern char first_movingB;
-extern char moving_dirA;
-extern char moving_dirB;
+char first_movingA = 1;
+char first_movingB = 1;
+char moving_dirA = 0;
+char moving_dirB = 0;
 extern signed int destination_A;
 extern signed int destination_B;
 extern unsigned char move_direction;
-extern unsigned int countMoving;
+unsigned int countMoving = 0;
 uint32_t stopTime;
-extern unsigned int accel, acceleration;
-extern volatile uint32_t adc_select;
-extern volatile uint32_t adc_error;
-extern unsigned int adc0_N, adc1_N, adc2_N, adc3_N, adc5_N, adc6_N, adc7_N;
-extern unsigned int adc0_SUM, adc1_SUM, adc2_SUM, adc3_SUM, adc5_SUM, adc6_SUM, adc7_SUM; 
-extern unsigned int adc0_VAL, adc1_VAL, adc2_VAL, adc3_VAL, adc5_VAL, adc6_VAL, adc7_VAL;
 extern float MotorA_ramp;
 extern float MotorB_ramp;
 
@@ -116,6 +112,114 @@ int32_t err_position_start;
 uint8_t motorStarting;
 uint8_t OneHallUsed;
 
+
+
+
+static inline void motor_accelerate(int pid_out){
+
+	if(!(bldc_cm->state & BLDC_MOTOR_STATE_DC_OPERATION)){
+		bldc_cm->state &= ~BLDC_MOTOR_STATE_BRAKING;
+	}
+	else //DC operation
+	{
+	  //A MOTOR
+	  if (!(bldc_cm->state & BLDC_MOTOR_STATE_DC_B_MOTOR) || (bldc_cm->state & BLDC_MOTOR_STATE_DC_AB_MOTOR) ){
+		if(flags&(1<<pwm_1)){
+		  //LPC_TMR16B0->MR1 = 0;
+		  setGPIO_Function(MOTOR_2H_PORT(bldc_cm->index), MOTOR_2H_PIN(bldc_cm->index), MODE_OUTPUT);
+		  HAL_GPIO_WritePin(MOTOR_3L_PORT(bldc_cm->index), MOTOR_3L_PIN(bldc_cm->index), GPIO_PIN_RESET);	//disable MOTOR_EN_2
+		  HAL_GPIO_WritePin(MOTOR_1L_PORT(bldc_cm->index), MOTOR_1L_PIN(bldc_cm->index), GPIO_PIN_RESET);	//disable MOTOR_EN_1
+		  //LPC_TMR16B0->MR0 = pid_out;
+		  setGPIO_Function(MOTOR_1H_PORT(bldc_cm->index), MOTOR_1H_PIN(bldc_cm->index), MODE_ALTERNATE);
+		  HAL_GPIO_WritePin(MOTOR_2L_PORT(bldc_cm->index), MOTOR_2L_PIN(bldc_cm->index), GPIO_PIN_SET);		//enable  MOTOR_EN_12
+		}
+		else if(flags&(1<<pwm_12)){
+		  //LPC_TMR16B0->MR0 = 0;
+		  setGPIO_Function(MOTOR_1H_PORT(bldc_cm->index), MOTOR_1H_PIN(bldc_cm->index), MODE_OUTPUT);
+		  HAL_GPIO_WritePin(MOTOR_3L_PORT(bldc_cm->index), MOTOR_3L_PIN(bldc_cm->index), GPIO_PIN_RESET);	//disable MOTOR_EN_2
+		  HAL_GPIO_WritePin(MOTOR_2L_PORT(bldc_cm->index), MOTOR_2L_PIN(bldc_cm->index), GPIO_PIN_RESET);	//disable MOTOR_EN_12
+		  //LPC_TMR16B0->MR1 = pid_out;
+		  setGPIO_Function(MOTOR_2H_PORT(bldc_cm->index), MOTOR_2H_PIN(bldc_cm->index), MODE_ALTERNATE);
+		  HAL_GPIO_WritePin(MOTOR_1L_PORT(bldc_cm->index), MOTOR_1L_PIN(bldc_cm->index), GPIO_PIN_SET);		//enable  MOTOR_EN_1
+		}
+	  }
+	  //B MOTOR
+	  if (bldc_cm->state & BLDC_MOTOR_STATE_DC_B_MOTOR) {
+		if(flags&(1<<pwm_2)){
+		  //LPC_TMR16B0->MR1 = 0;
+		  setGPIO_Function(MOTOR_2H_PORT(bldc_cm->index), MOTOR_2H_PIN(bldc_cm->index), MODE_OUTPUT);
+		  HAL_GPIO_WritePin(MOTOR_3L_PORT(bldc_cm->index), MOTOR_3L_PIN(bldc_cm->index), GPIO_PIN_RESET);	//disable MOTOR_EN_2
+		  HAL_GPIO_WritePin(MOTOR_1L_PORT(bldc_cm->index), MOTOR_1L_PIN(bldc_cm->index), GPIO_PIN_RESET);	//disable MOTOR_EN_1
+		  //LPC_TMR16B1->MR0 = pid_out;
+		  setGPIO_Function(MOTOR_3H_PORT(bldc_cm->index), MOTOR_3H_PIN(bldc_cm->index), MODE_ALTERNATE);
+		  HAL_GPIO_WritePin(MOTOR_2L_PORT(bldc_cm->index), MOTOR_2L_PIN(bldc_cm->index), GPIO_PIN_SET);		//enable  MOTOR_EN_12
+		}
+		else if(flags&(1<<pwm_12)){
+		  //LPC_TMR16B1->MR0 = 0;
+		  setGPIO_Function(MOTOR_3H_PORT(bldc_cm->index), MOTOR_3H_PIN(bldc_cm->index), MODE_OUTPUT);
+		  HAL_GPIO_WritePin(MOTOR_1L_PORT(bldc_cm->index), MOTOR_1L_PIN(bldc_cm->index), GPIO_PIN_RESET);	//disable MOTOR_EN_1
+		  HAL_GPIO_WritePin(MOTOR_2L_PORT(bldc_cm->index), MOTOR_2L_PIN(bldc_cm->index), GPIO_PIN_RESET);	//disable MOTOR_EN_12
+
+		  setGPIO_Function(MOTOR_2H_PORT(bldc_cm->index), MOTOR_2H_PIN(bldc_cm->index), MODE_ALTERNATE);	//LPC_TMR16B0->MR1 = pid_out;
+		  HAL_GPIO_WritePin(MOTOR_3L_PORT(bldc_cm->index), MOTOR_3L_PIN(bldc_cm->index), GPIO_PIN_SET);		//enable  MOTOR_EN_2
+		  //enable MOTOR_EN_2
+		}
+	  }
+	}
+	bldc_update_pwm(pid_out);
+	ActivateDrivers(1);
+}
+
+static inline void motor_brake(int pid_out){
+
+	if(!(bldc_cm->state & BLDC_MOTOR_STATE_DC_OPERATION)){
+		bldc_cm->state |= BLDC_MOTOR_STATE_BRAKING;
+	}
+	else //DC operation
+	{
+		  //A MOTOR
+		  if (!(bldc_cm->state & BLDC_MOTOR_STATE_DC_B_MOTOR) || (bldc_cm->state & BLDC_MOTOR_STATE_DC_AB_MOTOR) ){
+			if(flags&(1<<pwm_12)){
+			  setGPIO_Function(MOTOR_2H_PORT(bldc_cm->index), MOTOR_2H_PIN(bldc_cm->index), MODE_OUTPUT);		//LPC_TMR16B0->MR1 = 0;
+			  HAL_GPIO_WritePin(MOTOR_3L_PORT(bldc_cm->index), MOTOR_3L_PIN(bldc_cm->index), GPIO_PIN_RESET);	//disable MOTOR_EN_2
+			  HAL_GPIO_WritePin(MOTOR_1L_PORT(bldc_cm->index), MOTOR_1L_PIN(bldc_cm->index), GPIO_PIN_RESET);	//disable MOTOR_EN_1
+
+			  setGPIO_Function(MOTOR_1H_PORT(bldc_cm->index), MOTOR_1H_PIN(bldc_cm->index), MODE_ALTERNATE);	//LPC_TMR16B0->MR0 = pid_out;
+			  HAL_GPIO_WritePin(MOTOR_2L_PORT(bldc_cm->index), MOTOR_2L_PIN(bldc_cm->index), GPIO_PIN_SET);		//enable  MOTOR_EN_12
+			}
+			else if(flags&(1<<pwm_1)){
+			  setGPIO_Function(MOTOR_1H_PORT(bldc_cm->index), MOTOR_1H_PIN(bldc_cm->index), MODE_OUTPUT);		//LPC_TMR16B0->MR0 = 0;
+			  HAL_GPIO_WritePin(MOTOR_3L_PORT(bldc_cm->index), MOTOR_3L_PIN(bldc_cm->index), GPIO_PIN_RESET);	//disable MOTOR_EN_2
+			  HAL_GPIO_WritePin(MOTOR_2L_PORT(bldc_cm->index), MOTOR_2L_PIN(bldc_cm->index), GPIO_PIN_RESET);	//disable MOTOR_EN_12
+
+			  setGPIO_Function(MOTOR_2H_PORT(bldc_cm->index), MOTOR_2H_PIN(bldc_cm->index), MODE_ALTERNATE);	//LPC_TMR16B0->MR1 = pid_out;
+			  HAL_GPIO_WritePin(MOTOR_1L_PORT(bldc_cm->index), MOTOR_1L_PIN(bldc_cm->index), GPIO_PIN_SET);		//enable  MOTOR_EN_1
+			}
+		  }
+		  //B MOTOR
+		  if (bldc_cm->state & BLDC_MOTOR_STATE_DC_B_MOTOR) {
+			if(flags&(1<<pwm_12)){
+			  setGPIO_Function(MOTOR_2H_PORT(bldc_cm->index), MOTOR_2H_PIN(bldc_cm->index), MODE_OUTPUT);		//LPC_TMR16B0->MR1 = 0;
+			  HAL_GPIO_WritePin(MOTOR_3L_PORT(bldc_cm->index), MOTOR_3L_PIN(bldc_cm->index), GPIO_PIN_RESET);	//disable MOTOR_EN_2
+			  HAL_GPIO_WritePin(MOTOR_1L_PORT(bldc_cm->index), MOTOR_1L_PIN(bldc_cm->index), GPIO_PIN_RESET);	//disable MOTOR_EN_1
+
+			  setGPIO_Function(MOTOR_3H_PORT(bldc_cm->index), MOTOR_3H_PIN(bldc_cm->index), MODE_ALTERNATE);	//LPC_TMR16B1->MR0 = pid_out;
+			  HAL_GPIO_WritePin(MOTOR_2L_PORT(bldc_cm->index), MOTOR_2L_PIN(bldc_cm->index), GPIO_PIN_SET);		//enable  MOTOR_EN_12
+			}
+			else if(flags&(1<<pwm_2)){
+			  setGPIO_Function(MOTOR_3H_PORT(bldc_cm->index), MOTOR_3H_PIN(bldc_cm->index), MODE_OUTPUT);		//LPC_TMR16B1->MR0 = 0;
+			  HAL_GPIO_WritePin(MOTOR_1L_PORT(bldc_cm->index), MOTOR_1L_PIN(bldc_cm->index), GPIO_PIN_RESET);	//disable MOTOR_EN_1
+			  HAL_GPIO_WritePin(MOTOR_2L_PORT(bldc_cm->index), MOTOR_2L_PIN(bldc_cm->index), GPIO_PIN_RESET);	//disable MOTOR_EN_12
+
+			  setGPIO_Function(MOTOR_2H_PORT(bldc_cm->index), MOTOR_2H_PIN(bldc_cm->index), MODE_ALTERNATE);	//LPC_TMR16B0->MR1 = pid_out;
+			  HAL_GPIO_WritePin(MOTOR_3L_PORT(bldc_cm->index), MOTOR_3L_PIN(bldc_cm->index), GPIO_PIN_SET);		//enable  MOTOR_EN_2
+			}
+		  }
+	}
+	bldc_update_pwm(pid_out);
+	ActivateDrivers(1);
+}
+
 void position_handling(void) {
 
 
@@ -135,11 +239,11 @@ void position_handling(void) {
     return;
   }else if (stop_timeout > 0){  //speed = 0 & stop timeout reached
     stop_timeout = 0;
-    stop_motor();
+    bldc_Stop(0);
     stop_started = 0;
     brakeStarted = 0;
     pid_I = 0;
-    if (!(flags&(1<<select_B_motor)) ){
+    if (!(bldc_cm->state & BLDC_MOTOR_STATE_DC_B_MOTOR)){
       destination_A = position_A;
     }else{
       destination_B = position_B;
@@ -148,10 +252,9 @@ void position_handling(void) {
   }
 
   if (move_direction != 0) {
-
     int32_t err_position;
 
-    if (!(flags&(1<<select_B_motor)) ){
+    if (!(bldc_cm->state & BLDC_MOTOR_STATE_DC_B_MOTOR)){
       err_position = destination_A - position_A;
       stopTime = MotorA_ramp * 10;
       speed_freewheel = speed_freewheelA;
@@ -162,15 +265,15 @@ void position_handling(void) {
       speed_freewheel = speed_freewheelB;
     }
     if(move_direction == MOVE_DIR_OUT && err_position < -100 && //Stop when direction of destination is changed
-       (!(flags& (1 << do_ref_A) && !(flags&(1<<select_B_motor)))) && (!(flags& (1 << do_ref_B) && (flags&(1<<select_B_motor)))) ) //not when homing
+       (!(bldc_cm->ctrl & BLDC_CTRL_HOMING && !(bldc_cm->state & BLDC_MOTOR_STATE_DC_B_MOTOR))) &&  (!(bldc_cm->ctrl & BLDC_CTRL_HOMING_B && (bldc_cm->state & BLDC_MOTOR_STATE_DC_B_MOTOR) )) ) //not when homing
     {       
-      stop_motor();
+    	bldc_Stop(0);
       return;
     }
     else if(move_direction == MOVE_DIR_IN && err_position > 100 && //Stop when direction of destination is changed
-            (!(flags& (1 << do_ref_A) && !(flags&(1<<select_B_motor)))) && (!(flags& (1 << do_ref_B) && (flags&(1<<select_B_motor)))) ) //not when homing
+    		(!(bldc_cm->ctrl & BLDC_CTRL_HOMING && !(bldc_cm->state & BLDC_MOTOR_STATE_DC_B_MOTOR))) && (!(bldc_cm->ctrl & BLDC_CTRL_HOMING_B && (bldc_cm->state & BLDC_MOTOR_STATE_DC_B_MOTOR))) ) //not when homing
     {
-      stop_motor();
+    	bldc_Stop(0);
       return;
     }
     err_position = abs(err_position);
@@ -187,8 +290,8 @@ void position_handling(void) {
 
     speed_real = (ZEROSPEED * 100)/speed_h; // period converted to speed
 
-    if((err_position * speed_h < (stopTime_real) ) && !stop_started && (!(flags & (1 << manual_drive))) && //speed_h  je perioda (1/v), za manj racunanja
-      (!(flags& (1 << do_ref_A) && !(flags&(1<<select_B_motor)))) && (!(flags& (1 << do_ref_B) && (flags&(1<<select_B_motor)))) ) // Dont stop when homing
+    if((err_position * speed_h < (stopTime_real) ) && !stop_started && (!ButtonStatus) && //speed_h  je perioda (1/v), za manj racunanja
+    		(!(bldc_cm->ctrl & BLDC_CTRL_HOMING && !(bldc_cm->state & BLDC_MOTOR_STATE_DC_B_MOTOR))) && (!(bldc_cm->ctrl & BLDC_CTRL_HOMING_B && bldc_cm->state & BLDC_MOTOR_STATE_DC_B_MOTOR)) ) // Dont stop when homing
     { 
       stop_started = 1;
       speed_onStart = speed_real;
@@ -208,7 +311,7 @@ void position_handling(void) {
         stopTime_cnt ++;
         if(speed_h == ZEROSPEED){
           stopTime = stopTime_cnt;
-          if (!(flags&(1<<select_B_motor)) ){
+          if (!(bldc_cm->state & BLDC_MOTOR_STATE_DC_B_MOTOR)){
             MotorA_ramp = stopTime /10;
             speed_freewheelA = speed_freewheel;
           }
@@ -221,8 +324,6 @@ void position_handling(void) {
       }
       was_full_speed_move = 0;
       stopTime_cnt = 0;
-
-      flags&=~(1<<full_pwm);
 
       //HARD ACTIVE BRAKING
       if(err_position < 1 || brakeStarted ||   (err_position <= 2 && (speed_h < speed_freewheel*6 || OneHallUsed)) ){ 
@@ -272,8 +373,8 @@ void position_handling(void) {
       }
 #endif
       if(pid_out > 0){ //ACCELERATE
-          if(pid_out > PWM_PERIODA_MR3){ //Limits
-            pid_out = PWM_PERIODA_MR3;
+          if(pid_out > MOTOR_PWM_PERIOD){ //Limits
+            pid_out = MOTOR_PWM_PERIOD;
           }
           motor_accelerate(pid_out); 
       }
@@ -286,12 +387,11 @@ void position_handling(void) {
 
     else{   //Motor start
       pid_out += MOTOR_START_RAMP;
-      if(pid_out > PWM_PERIODA_MR3){    //Max Limit
-        pid_out = PWM_PERIODA_MR3;
-        flags|=(1<<full_pwm);
+      if(pid_out > MOTOR_PWM_PERIOD){    //Max Limit
+        pid_out = MOTOR_PWM_PERIOD;
         motorStarting = 0;
-      }else if (pid_out < PWM_START_MR){//Min Limit
-        pid_out = PWM_START_MR;
+      }else if (pid_out < MOTOR_PWM_MIN){//Min Limit
+        pid_out = MOTOR_PWM_MIN;
         motorStarting = 1;//prevent debounce filtering on startup
       }
       motor_accelerate(pid_out);
@@ -304,106 +404,20 @@ void position_handling(void) {
 
 
 
-static inline void motor_accelerate(int pid_out){
 
-	if(!(bldc_cm->state & BLDC_MOTOR_STATE_DC_OPERATION)){
-		bldc_cm->state &= ~BLDC_MOTOR_STATE_BRAKING;
-	}
-	else //DC operation
-	{
-	  //A MOTOR
-	  if (!(flags&(1<<select_B_motor)) || (flags&(1<<select_AB_motor)) ){
-		if(flags&(1<<pwm_1)){
-		  LPC_TMR16B0->MR1 = 0;
-		  GPIOSetValue(PORT_3, 1, clear);           //disable MOTOR_EN_2
-		  GPIOSetValue(PORT_3, 3, clear);     	//disable MOTOR_EN_1
-		  LPC_TMR16B0->MR0 = pid_out;
-		  GPIOSetValue(PORT_3, 2, set);		//enable  MOTOR_EN_12
-		}
-		else if(flags&(1<<pwm_12)){
-		  LPC_TMR16B0->MR0 = 0;
-		  GPIOSetValue(PORT_3, 1, clear);            //disable MOTOR_EN_2
-		  GPIOSetValue(PORT_3, 2, clear);     	//disable MOTOR_EN_12
-		  LPC_TMR16B0->MR1 = pid_out;
-		  GPIOSetValue(PORT_3, 3, set);		//enable MOTOR_EN_1
-		}
-	  }
-	  //B MOTOR
-	  if (flags&(1<<select_B_motor)){
-		if(flags&(1<<pwm_2)){
-		LPC_TMR16B0->MR1 = 0;
-		  GPIOSetValue(PORT_3, 1, clear);           //disable MOTOR_EN_2
-		  GPIOSetValue(PORT_3, 3, clear);     	//disable MOTOR_EN_1
-		  LPC_TMR16B1->MR0 = pid_out;
-		  GPIOSetValue(PORT_3, 2, set);		//enable  MOTOR_EN_12
-		}
-		else if(flags&(1<<pwm_12)){
-		  LPC_TMR16B1->MR0 = 0;
-		  GPIOSetValue(PORT_3, 3, clear);            //disable MOTOR_EN_1
-		  GPIOSetValue(PORT_3, 2, clear);     	//disable MOTOR_EN_12
-		  LPC_TMR16B0->MR1 = pid_out;
-		  GPIOSetValue(PORT_3, 1, set);		//enable MOTOR_EN_2
-		}
-	  }
-	}
-}
+#define getHallStateA1(motorIndex) (motorIndex ? HAL_GPIO_ReadPin(HALL_A1_GPIO_Port, HALL_A1_Pin ) : HAL_GPIO_ReadPin(HALL_B1_GPIO_Port, HALL_B1_Pin ))
+#define getHallStateA2(motorIndex) (motorIndex ? HAL_GPIO_ReadPin(HALL_A2_GPIO_Port, HALL_A2_Pin ) : HAL_GPIO_ReadPin(HALL_B2_GPIO_Port, HALL_B2_Pin ))
 
-static inline void motor_brake(int pid_out){
-
-	if(!(bldc_cm->state & BLDC_MOTOR_STATE_DC_OPERATION)){
-		bldc_cm->state |= BLDC_MOTOR_STATE_BRAKING;
-	}
-	else //DC operation
-	{
-	  //A MOTOR
-	  if (!(flags&(1<<select_B_motor)) || (flags&(1<<select_AB_motor)) ){
-		if(flags&(1<<pwm_12)){
-		  LPC_TMR16B0->MR1 = 0;
-		  GPIOSetValue(PORT_3, 1, clear);           //disable MOTOR_EN_2
-		  GPIOSetValue(PORT_3, 3, clear);     	//disable MOTOR_EN_1
-		  LPC_TMR16B0->MR0 = pid_out;
-		  GPIOSetValue(PORT_3, 2, set);		//enable  MOTOR_EN_12
-		}
-		else if(flags&(1<<pwm_1)){
-		  LPC_TMR16B0->MR0 = PWM_MAX_NEG;
-		  GPIOSetValue(PORT_3, 1, clear);           //disable MOTOR_EN_2
-		  GPIOSetValue(PORT_3, 2, clear);     	//disable MOTOR_EN_12
-		  LPC_TMR16B0->MR1 = pid_out;
-		  GPIOSetValue(PORT_3, 3, set);		//enable MOTOR_EN_1
-		}
-	  }
-	  //B MOTOR
-	  else if (flags&(1<<select_B_motor)){
-		if(flags&(1<<pwm_12)){
-		  LPC_TMR16B0->MR1 = 0;
-		  GPIOSetValue(PORT_3, 1, clear);           //disable MOTOR_EN_2
-		  GPIOSetValue(PORT_3, 3, clear);     	//disable MOTOR_EN_1
-		  LPC_TMR16B1->MR0 = pid_out;
-		  GPIOSetValue(PORT_3, 2, set);		//enable  MOTOR_EN_12
-		}
-		else if(flags&(1<<pwm_2)){
-		  LPC_TMR16B1->MR0 = 0;
-		  GPIOSetValue(PORT_3, 2, clear);     	//disable MOTOR_EN_12
-		  GPIOSetValue(PORT_3, 3, clear);		//disable MOTOR_EN_1
-		  LPC_TMR16B0->MR1 = pid_out;
-		  GPIOSetValue(PORT_3, 1, set);             //enable MOTOR_EN_2
-		}
-	  }
-	}
-}
-
-
-
-
-
+#define getHallStateB1(motorIndex) (motorIndex ? HAL_GPIO_ReadPin(HALL_A3_GPIO_Port, HALL_A3_Pin ) : HAL_GPIO_ReadPin(HALL_B3_GPIO_Port, HALL_B3_Pin ))
+#define getHallStateB2(motorIndex) (motorIndex ? HAL_GPIO_ReadPin(END_SW_A_HI_GPIO_Port, END_SW_A_HI_Pin ) : HAL_GPIO_ReadPin(END_SW_B_HI_GPIO_Port, END_SW_B_HI_Pin ))
 
 
 void DC_QuadEncoder(void){
 	//----------A-MOTOR Fast Hall Read
-	  if (!(flags&(1<<select_B_motor)) || (flags&(1<<select_AB_motor)) ){
+	  if (!(bldc_cm->state & BLDC_MOTOR_STATE_DC_B_MOTOR) || (bldc_cm->state & BLDC_MOTOR_STATE_DC_AB_MOTOR) ){
 	    if((hall_enable & 0x03) == 0x03 || (hall_enable & 0x03) == 0x01) { //Read motor speed 4x per turn
 	      //----- Hall A1 -----
-	      if (GPIOReadValue(PORT_2,7)) {  				// *** hall 1 = 1 ***
+	      if (getHallStateA1(bldc_cm->index) == GPIO_PIN_SET) {  				// *** hall 1 = 1 ***
 	        if(hallState_prev_A1 == 0){
 	          if(hallCnt1A_S > (speed_h/2) || (++debounce_cntA > HALL_DEBOUNCE)){ //FILTER: ignore too short pulses, or deounce counter
 	            speed_h = hallCnt1A_S;     //South pole magnet counter
@@ -442,7 +456,7 @@ void DC_QuadEncoder(void){
 
 	    if((hall_enable & 0x03) == 0x03 || (hall_enable & 0x03) == 0x02) {
 	      //----- Hall A2 -----
-	      if (GPIOReadValue(PORT_2,6)) {  				// *** hall 1 = 1 ***
+	      if (getHallStateA2(bldc_cm->index) == GPIO_PIN_SET) { 				// *** hall 1 = 1 ***
 	        if(hallState_prev_A2 == 0){
 	          if(hallCnt2A_S > (speed_h/2) || (++debounce_cntA > HALL_DEBOUNCE)){ //ignore too short pulses (debouncing)
 	            speed_h = hallCnt2A_S;     //South pole magnet counter
@@ -480,10 +494,10 @@ void DC_QuadEncoder(void){
 	  }
 
 	  //----------B-MOTOR Fast Hall Read
-	  else if (flags&(1<<select_B_motor)){
+	  else if (bldc_cm->state & BLDC_MOTOR_STATE_DC_B_MOTOR){
 	    if(((hall_enable & 0x03<<16) == 0x03<<16) || ((hall_enable & 0x03<<16) == 0x01<<16)) { //Read motor speed 4x per turn
 	      //----- Hall B1 -----
-	      if (GPIOReadValue(PORT_0,5)) {  				// *** hall 1 = 1 ***
+	      if (getHallStateB1(bldc_cm->index) == GPIO_PIN_SET) { 				// *** hall 1 = 1 ***
 	        if(hallState_prev_B1 == 0){
 	          if(hallCnt1A_S > (speed_h/2) || (++debounce_cntB > HALL_DEBOUNCE)){ //ignore too short pulses (debouncing)
 	            speed_h = hallCnt1A_S;     //South pole magnet counter
@@ -523,7 +537,7 @@ void DC_QuadEncoder(void){
 
 	    if(((hall_enable & 0x03<<16) == 0x03<<16) || ((hall_enable & 0x03<<16) == 0x02<<16)) {
 	      //----- Hall B2 -----
-	      if (GPIOReadValue(PORT_0,4)) {  				// *** hall 1 = 1 ***
+	      if (getHallStateB2(bldc_cm->index) == GPIO_PIN_SET) {  				// *** hall 1 = 1 ***
 	        if(hallState_prev_B2 == 0){
 	          if(hallCnt2A_S > (speed_h/2) || (++debounce_cntB > HALL_DEBOUNCE)){ //ignore too short pulses (debouncing)
 	            speed_h = hallCnt2A_S;     //South pole magnet counter
@@ -610,7 +624,7 @@ void DC_QuadEncoder(void){
 
 	      if(first_movingA == 1) {
 	        first_movingA = 0;
-	        if (destination_A < position_A || (flags & (1 << do_ref_A)))
+	        if (destination_A < position_A || (bldc_cm->ctrl & BLDC_CTRL_HOMING))
 	          moving_dirA = 0;
 	        else if(destination_A > position_A)
 	          moving_dirA = 1;
@@ -677,7 +691,7 @@ void DC_QuadEncoder(void){
 
 	      if(first_movingB == 1) {
 	        first_movingB = 0;
-	        if (destination_B < position_B || (flags & (1 << do_ref_B)))
+	        if (destination_B < position_B || (bldc_cm->ctrl & BLDC_CTRL_HOMING_B))
 	          moving_dirB = 0;
 	        else if(destination_B > position_B)
 	          moving_dirB = 1;

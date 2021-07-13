@@ -26,7 +26,6 @@
 #define BldVersionAddress   0x08000150      //v bootloaderju naslov, kjer je napisana verzija bootloaderja
 #define ADC1_DR_Address     0x4001244C
 
-#define ZEROSPEED           2000            //ko se motor ne vrti, je speed==ZEROSPEED
 #define ZEROSPEED_S         4000
 #define ZEROSPEED_VS        8000
 

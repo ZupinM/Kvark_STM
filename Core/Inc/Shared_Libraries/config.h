@@ -43,7 +43,10 @@ Header file za SunTracer
 #define MAX_ROUTE_HOPS  6
  
 //		flags;		
-#define tick_1ms 			3           //"1" = 20ms tick appear 
+#define pwm_1                 0           //"1" = pwm 1 enable
+#define pwm_12                1           //"1" = pwm 12 enable
+#define pwm_2                 2           //"1" = pwm 2 enable
+#define tick_1ms 			  3           //"1" = 20ms tick appear
 #define flash_erase_done                10 			//"1" = flash erase for settings is done
 #define reset_it                        11			//"1" = do reset
 #define flash_write_done                15
@@ -135,7 +138,6 @@ int move_in_A (void);
 int move_out_A (void);
 int move_in_B (void);
 int move_out_B (void);
-void stop_motor (void);
 void motor_check_position (void);
 void go_ref(void);
 //void flash_read (unsigned int read_address);

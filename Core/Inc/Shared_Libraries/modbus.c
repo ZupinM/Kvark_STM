@@ -36,6 +36,7 @@ unsigned char enable_tracking_retry = 0;
 extern unsigned char enabled_in_micro;
 extern unsigned int sigma_just_connected;
 extern float           LineResistance;
+extern unsigned int hall_enable;
 
 extern uint8_t usb_drive;
 extern uint8_t voltage_select;
@@ -473,7 +474,6 @@ void modbus_cmd() {
 
         // STOP
         case MCMD_W_stop_motor: {					
-          //stop_motor ();	
           RMeasure_Stop();
           //bldc_manual(1);  // mzp
           bldc_Stop(1);
@@ -628,6 +628,21 @@ void modbus_cmd() {
           break;
         }
 #endif                
+
+        case MCMD_R_HallState: {
+          read_int_buf[0] = hall_enable;
+          mcmd_read_int(1, slave_addr);
+          break;
+        }
+
+        case MCMD_W_SetHallState: {
+          Utemp = mcmd_write_int(0, 0xffffffff);
+          hall_enable &= ~0x03;
+          hall_enable &= ~(0x03 << 16);
+          hall_enable |= Utemp & (0x03 | 0x03 << 16);
+          break;
+        }
+
         case MCMD_R_AxisState: {
           read_int_buf[0] = bldc_GetEnabledMotors();
           number_TX_bytes0 = mcmd_read_int(1, slave_addr);

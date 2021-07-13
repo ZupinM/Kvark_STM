@@ -10,7 +10,7 @@ typedef struct{
   //motor index
   unsigned char index;
   //runtime variables
-  unsigned char state;
+  int state;
   int status;
   int ctrl;
   int position;
@@ -64,6 +64,9 @@ extern bldc_motor *bldc_cm;
 #define BLDC_MOTOR_STATE_INVERT_HALL_REQUEST_STATE (1<<6)
 
 #define BLDC_MOTOR_STATE_DC_OPERATION (1<<7)
+#define BLDC_MOTOR_STATE_DC_B_MOTOR (1<<8)
+#define BLDC_MOTOR_STATE_DC_AB_MOTOR (1<<9)
+#define BLDC_MOTOR_STATE_BRAKING (1<<10)
 #define BLDC_MOTOR_COUNT 2
 
 
@@ -103,6 +106,10 @@ extern bldc_motor *bldc_cm;
 #define BLDC_SAVE               (1U<<1)
 #define BLDC_LOCKED             (1U<<0)
 
+#define BLDC_CTRL_IDLE         0
+#define BLDC_CTRL_TRACKING     (1<<1)
+#define BLDC_CTRL_HOMING       (1<<2)
+#define BLDC_CTRL_HOMING_B       (1<<4)
 #define BLDC_CTRL_STOP         (1<<3)
 
 #define OTHER_MOTOR(M)   ((M)^1)
@@ -124,6 +131,10 @@ extern bldc_motor *bldc_cm;
 #define MOTOR_CUTOF_LEVEL12             9.8
 
 #define SHUTDOWN_VOLTAGE                8
+
+
+#define MODE_OUTPUT 0x01
+#define MODE_ALTERNATE  0x02
 
 void LEDGreenSet(unsigned char state);
 void LEDOrangeSet(unsigned char state);
@@ -181,6 +192,8 @@ void bldc_Lock(int state);
 void bldc_SetInvert(unsigned char motor, unsigned int state);
 void bldc_SetInvertHall(unsigned char motor, unsigned int state);
 void bldc_runout(int state);
+void bldc_update_pwm(unsigned short value);
+void ActivateDrivers(int dir);
 
 
 #endif

@@ -76,20 +76,6 @@ const unsigned char dc_ccw_next[8] = {0, 0, 0, 0, 6, 4, 7, 5};
 
 #include "suntracer.h"
 
-
-#define BLDC_CTRL_IDLE         0
-#define BLDC_CTRL_TRACKING     (1<<1)
-#define BLDC_CTRL_HOMING       (1<<2)
-
-
- #define BLDC_ADC_CONTROL     ( 11 - 1 )
- #define BLDC_ADC_U_MEASURE   (0x01) 
- #define BLDC_ADC_I_MEASURE   (0x02) 
- #define BLDC_ADC_START       (1<<24)
-
-
-
-
 float        bldc_pwm;
 int          bldc_runtime;
 int          bldc_idletime;
@@ -844,13 +830,6 @@ int bldc_HomeSwitchActive(unsigned char motor , unsigned char switch_h_l) {
   return 0;
 }
 
-
-unsigned char OldState;
-
-
-#define MODE_OUTPUT 0x01
-#define MODE_ALTERNATE  0x02
-
 void setGPIO_Function(GPIO_TypeDef  *GPIOx, uint16_t GPIO_Pin, uint8_t mode){
 	uint32_t temp = GPIOx->MODER;
 	temp &= ~(GPIO_Pin*GPIO_Pin*0x3); // 00-Input mode
@@ -1011,9 +990,6 @@ unsigned int motor_err(uint8_t motor)
 }
 
 
-#define BLDC_RAMP_UP 2
-#define BLDC_RAMP_DOWN 10
-
 #define MAX_PWM 0xFFF
 #define START_PWM 315
 #define PWM_STEP 4
@@ -1022,157 +998,7 @@ int marginPulses;
 int startPulses;
 int halfPos;
 int breaking = 0;
-void motor_rampDC() {
-  int err = bldc_cm->target - bldc_cm->position;
 
-  int diff_start; 
-  if (bldc_cm->index == 0)
-    diff_start = trunc(0.05 * gear_ratio_A);
-  else if (bldc_cm->index == 1)
-    diff_start = trunc(0.05 * gear_ratio_B);
-  else {
-    bldc_pwm = 0;
-    return;
-  }
-
-  if (abs(err) < diff_start) {
-
-    if(breaking > 0 && breaking <= 40) { // 40ms to stop DC motor
-      if (breaking == 1) {
-        bldc_pwm = MAX_PWM;
-        bldc_update_pwm(bldc_pwm);
-        ActivateDrivers(0);
-        bldc_SetDrivers(BLDC_PA_POS | BLDC_PB_POS, bldc_cm->index);
-      }
-      breaking++;
-    } 
-    else { 
-      bldc_pwm = 0;
-      bldc_update_pwm(bldc_pwm);
-      ActivateDrivers(0);
-      if (bldc_cm->ctrl != BLDC_CTRL_STOP) {
-        bldc_Stop(0);
-        bldc_cm->status &= ~BLDC_STATUS_MOVING;
-      }
-      breaking = 0;
-      return;
-    }
-  }
-
-  if (err < 0)
-    bldc_cm->status |= BLDC_STATUS_CCW;
-  else
-    bldc_cm->status &= ~BLDC_STATUS_CCW;
-
-  if(bldc_pwm == 0) { // start
-    bldc_pwm = START_PWM;
-    halfPos = (bldc_cm->target + bldc_cm->position) / 2;
-    startPulses = bldc_cm->position;
-    marginPulses = 0;
-  }
-
-  // marginPulses - no. of start pulses to or half pulses if not start to max PWM
-  else if(bldc_pwm > 0 && ((abs(err) < marginPulses || ((bldc_cm->position - halfPos > 0 && err > 0) || ((bldc_cm->position - halfPos < 0 && err < 0) && (marginPulses == 0))) )) && (abs(err) >= diff_start) ) { // breaking
-
-    breaking = 1;
-    if ( ((bldc_pwm - START_PWM) / 20) > ((float)abs(err) * 1.03) ) {
-      bldc_pwm -= (PWM_STEP * 20); // faster break
-    } else if ( ((bldc_pwm - START_PWM) / 20) < ((float)abs(err) * 0.97) ) {
-      bldc_pwm += (PWM_STEP * 10); // too fast break
-    }
-    else {
-      // do nothing this syyle
-    }
-  }
-  else if(bldc_pwm < MAX_PWM) { // accelerate
-    bldc_pwm += PWM_STEP;
-  }
-  else { // max power
-    bldc_pwm = MAX_PWM;
-    if(marginPulses == 0) {
-      marginPulses = abs(bldc_cm->position - startPulses);
-    }
-  }
-}
-
-void motor_ramp() {
-  int err = bldc_cm->target - bldc_cm->position;
-  //int dir = (err <= 0) ? 1: -1;
-
-  int rampval = pid_calc(&bldc_cm->pid) * 40.95; //resulting max rampval = 0xfff
-
-  if(direction_delay)
-    direction_delay--;
-  if(!direction_delay){
-    
-  //changing direction -- smooth transition
-    if (err>bldc_cm->pid.deadband && bldc_pwm<0 ) {
-      if(bldc_pwm < -BLDC_RAMP_DOWN)
-        bldc_pwm += BLDC_RAMP_DOWN;
-      else{
-        bldc_pwm  = 0;
-        //direction_delay = 100;
-      }
-      return;
-    }
-  
-    if(err<-bldc_cm->pid.deadband && bldc_pwm>0 ) {
-      if(bldc_pwm > BLDC_RAMP_DOWN)
-        bldc_pwm -= BLDC_RAMP_DOWN;
-      else{
-        bldc_pwm  = 0;
-        //direction_delay = 100;
-      }
-      return;
-    }
-
-  //stop request
-  if(rampval == 0 && bldc_pwm != 0) {
-    if(bldc_pwm < 0) {
-      if(bldc_pwm < -BLDC_RAMP_DOWN){
-        bldc_pwm += BLDC_RAMP_DOWN;
-        bldc_cm->status |= BLDC_STATUS_ACTIVE;
-        //bldc_cm->target = bldc_cm->position;
-        }
-      else
-        bldc_pwm = rampval;
-      //bldc_cm->status &= ~BLDC_STATUS_ACTIVE;
-        //bldc_SetDrivers(0,0);
-        //bldc_cm->target = bldc_cm->position;
-    }
-    if(bldc_pwm > 0) {
-      if(bldc_pwm>BLDC_RAMP_DOWN){
-        bldc_pwm -= BLDC_RAMP_DOWN;
-        bldc_cm->status |= BLDC_STATUS_ACTIVE;
-        }
-      else
-        bldc_pwm  = rampval;
-        //bldc_SetDrivers(0,0);
-        //bldc_cm->target = bldc_cm->position;
-    }
-    //direction_delay = 100;
-    return;
-  }
-
-  if(err > 0) {  //CW  
-    if(rampval > bldc_pwm){
-      if(bldc_pwm < 0xfff)
-        bldc_pwm += BLDC_RAMP_UP;
-    } else {
-      bldc_pwm = rampval;
-    }
-  
-  } else {  //CCW
-     if(rampval < bldc_pwm) { 
-       if(bldc_pwm > -0xfff)
-        bldc_pwm -= BLDC_RAMP_UP;
-    }else {
-      bldc_pwm = rampval;
-    }
-
-  }
-  }
-}
 
 unsigned int  bldc_recovery_overvoltage=0;
 unsigned int  bldc_recovery_undervoltage=0;
@@ -1437,17 +1263,11 @@ void bldc_process() {
   }
 
   // calculate next step
-  motor_ramp();
-
-  // limit pwm duty to working range
-  if(bldc_pwm >  0xfff)
-    bldc_pwm =   0xfff;
-  if(bldc_pwm < -0xfff)
-    bldc_pwm =  -0xfff;
+  //motor_ramp();
 
 
   //if(!direction_delay)
-  if((bldc_pwm > 0) && !(any_motor_moving && bldc_cm->status&BLDC_STATUS_CCW)) {
+  /*if((bldc_pwm > 0) && !(any_motor_moving && bldc_cm->status&BLDC_STATUS_CCW)) {
     bldc_cm->status &= ~BLDC_STATUS_CCW;
     ActivateDrivers(1);
     bldc_update_pwm(bldc_pwm);
@@ -1460,9 +1280,10 @@ void bldc_process() {
     if(bldc_idletime>=100) {
       bldc_idletime = 100;
       bldc_cm->ctrl = BLDC_CTRL_IDLE;  
-      ActivateDrivers(0);    
+      ActivateDrivers(0);
     }
-  } 
+  } */
+
 }
 
 int hallDCount = 0;
@@ -1618,8 +1439,7 @@ void dc_process() {
     bldc_cm->homing_time++;
   }
 
-  motor_rampDC();
-  bldc_update_pwm(bldc_pwm);
+  //motor_rampDC();
 
   if((bldc_pwm > 0) && !any_motor_moving && bldc_cm->ctrl != BLDC_CTRL_STOP) {
 
@@ -1737,9 +1557,9 @@ void bldc_Comutate(unsigned char motor){
 
     if(bldc_motors[motor].status & BLDC_STATUS_ACTIVE && (!(bldc_motors[OTHER_MOTOR(motor)].status & BLDC_STATUS_MOVING)  ||  BLDC_MOTOR_COUNT == 1)){   
         moving_counter[motor] = 100;
-        if(bldc_motors[motor].state & BLDC_MOTOR_STATE_INVERT_DIRECTION){//Inverted operation
+        if((bldc_motors[motor].state & BLDC_MOTOR_STATE_INVERT_DIRECTION) != (bldc_motors[motor].state & BLDC_MOTOR_STATE_BRAKING) ){//Inverted operation (XOR braking)
 
-            if(bldc_motors[motor].status & BLDC_STATUS_CCW)
+            if(bldc_motors[motor].status & BLDC_STATUS_CCW )
               bldc_SetDrivers(bldc_cw_next [state][1], motor);
             else                                 
               bldc_SetDrivers(bldc_ccw_next[state][1], motor); 

@@ -47,6 +47,7 @@
 #include "flash.h"
 #include "Shared_Libraries/modbus.h"
 #include "RTT/SEGGER_RTT.h"
+#include "position.h"
 
 #define DAY_MS 	 86400000
 #define HOUR_MS (DAY_MS/24)
@@ -177,6 +178,7 @@ uint8_t init_main_state = 1;
 extern volatile unsigned int number_of_poles;
 
 unsigned int motor_operation;
+unsigned int hall_enable;
 
 //fixed loaction in flash for version and checksum
 __attribute__ ((section (".appver")))
@@ -499,6 +501,7 @@ int main(void)
 	     if (systick_ms != 1)
 	       continue;
 	     systick_ms=0;       // execute every 1ms
+	     position_handling();
 
 	     //SEGGER_RTT_printf(0, "main period:%d\r\n", systick_count -systick_count_prev);
 	     //systick_count_prev = systick_count;
