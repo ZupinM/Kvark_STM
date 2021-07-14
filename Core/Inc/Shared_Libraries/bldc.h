@@ -1,9 +1,10 @@
 #ifndef BLDC
 #define BLDC
-#include "pid.h"
 #include <stdint.h>
 #include "adc.h"
+#include "position.h"
 
+#define BLDC_MOTOR_COUNT 2
 
 
 typedef struct{
@@ -19,7 +20,12 @@ typedef struct{
   int lastPosition;
   unsigned char hall_state;
 
-  pid pid;
+  float ramp;
+  uint16_t speed_freewheel;
+  uint16_t speed;
+  uint16_t speed_old;
+  uint16_t cnt_old;
+  uint8_t inactivity_cnt;
   //configuration
   float         gear_ratio;
   float         I_limit;
@@ -52,6 +58,7 @@ typedef struct{
 }bldc_misc;
 
 extern bldc_motor *bldc_cm;
+extern bldc_motor bldc_motors[BLDC_MOTOR_COUNT];
 
 
 #define BLDC_MOTOR_STATE_ENABLED (1<<0)
@@ -67,7 +74,6 @@ extern bldc_motor *bldc_cm;
 #define BLDC_MOTOR_STATE_DC_B_MOTOR (1<<8)
 #define BLDC_MOTOR_STATE_DC_AB_MOTOR (1<<9)
 #define BLDC_MOTOR_STATE_BRAKING (1<<10)
-#define BLDC_MOTOR_COUNT 2
 
 
 #define BLDC_STATUS_ACTIVE       (1<<0)

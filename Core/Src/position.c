@@ -26,7 +26,7 @@ int HallCnt1A, HallCnt1B, HallCnt2A, HallCnt2B;
 #define HALL_DEBOUNCE 6
 #define DOWN_POS_MIN 64 // 200ms
 #define DOWN_POS_DEFAULT 160 // 500ms
-#define MOTOR_START_RAMP 40
+#define MOTOR_START_RAMP 1
 
 extern volatile int slaveCommandTimeout;
 
@@ -52,20 +52,13 @@ unsigned int A_enc_temp;
 unsigned int B_enc_new;
 unsigned int B_enc_old;
 unsigned int B_enc_temp;
-extern unsigned int Hall_CntDown; 
-extern volatile signed int position_A;
-extern volatile signed int position_B;
 char first_movingA = 1;
 char first_movingB = 1;
 char moving_dirA = 0;
 char moving_dirB = 0;
-extern signed int destination_A;
-extern signed int destination_B;
 extern unsigned char move_direction;
 unsigned int countMoving = 0;
 uint32_t stopTime;
-extern float MotorA_ramp;
-extern float MotorB_ramp;
 
 uint8_t Pgain = 40;
 //float Pgain_neg = 0.5;  //Negative PWM PID
@@ -79,9 +72,6 @@ int32_t pid_out_prev;
 //#define USE_D_IN_PID 1
 //#define USE_I_IN_PID 1
 
-uint32_t speed_freewheel;
-extern uint32_t speed_freewheelA;
-extern uint32_t speed_freewheelB;
 uint32_t speed_onStart;
 int32_t speed_set;
 uint8_t stop_started;
@@ -104,7 +94,6 @@ uint8_t hallState_prev_A2;
 uint8_t hallState_prev_B1;
 uint8_t hallState_prev_B2;
 
-uint16_t speed_h; // high refresh rate speed (period)
 uint16_t speed_real; // period converted to speed
 int32_t speed_err;
 uint16_t speed_err_new; //pid_D saved speed
@@ -227,12 +216,21 @@ void position_handling(void) {
 	  DC_QuadEncoder();
   }
 
+  if (bldc_cm->speed == bldc_cm->speed_old){
+	  if(bldc_cm->inactivity_cnt++ > 50){
+		  bldc_cm->speed = ZEROSPEED;
+	  }
+  }else{
+	  bldc_cm->speed_old = bldc_cm->speed;
+	  bldc_cm->inactivity_cnt = 0;
+  }
+
 
 /******************************************************
     accelerating / breaking motors (for A and B axis)
 ******************************************************/
   if(stop_timeout > 10){      // Wait on stop_timeout
-    if(speed_h == ZEROSPEED)
+    if(bldc_cm->speed == ZEROSPEED)
       stop_timeout --;
     motor_break = 1;
     measureDelay = 10000;
@@ -243,38 +241,28 @@ void position_handling(void) {
     stop_started = 0;
     brakeStarted = 0;
     pid_I = 0;
-    if (!(bldc_cm->state & BLDC_MOTOR_STATE_DC_B_MOTOR)){
-      destination_A = position_A;
-    }else{
-      destination_B = position_B;
-    }
+    bldc_cm->target = bldc_cm->position;
     return;
   }
 
-  if (move_direction != 0) {
+  if (bldc_cm->status & BLDC_STATUS_ACTIVE) {
     int32_t err_position;
 
-    if (!(bldc_cm->state & BLDC_MOTOR_STATE_DC_B_MOTOR)){
-      err_position = destination_A - position_A;
-      stopTime = MotorA_ramp * 10;
-      speed_freewheel = speed_freewheelA;
-    }
-    else{
-      err_position = destination_B - position_B;
-      stopTime = MotorB_ramp * 10;
-      speed_freewheel = speed_freewheelB;
-    }
+	err_position = bldc_cm->target - bldc_cm->position;
+	stopTime = bldc_cm->ramp * 10;
+
+
     if(move_direction == MOVE_DIR_OUT && err_position < -100 && //Stop when direction of destination is changed
-       (!(bldc_cm->ctrl & BLDC_CTRL_HOMING && !(bldc_cm->state & BLDC_MOTOR_STATE_DC_B_MOTOR))) &&  (!(bldc_cm->ctrl & BLDC_CTRL_HOMING_B && (bldc_cm->state & BLDC_MOTOR_STATE_DC_B_MOTOR) )) ) //not when homing
+       (!(bldc_cm->ctrl & BLDC_CTRL_HOMING ))  ) //not when homing
     {       
     	bldc_Stop(0);
-      return;
+        return;
     }
     else if(move_direction == MOVE_DIR_IN && err_position > 100 && //Stop when direction of destination is changed
-    		(!(bldc_cm->ctrl & BLDC_CTRL_HOMING && !(bldc_cm->state & BLDC_MOTOR_STATE_DC_B_MOTOR))) && (!(bldc_cm->ctrl & BLDC_CTRL_HOMING_B && (bldc_cm->state & BLDC_MOTOR_STATE_DC_B_MOTOR))) ) //not when homing
+    		(!(bldc_cm->ctrl & BLDC_CTRL_HOMING )) ) //not when homing
     {
     	bldc_Stop(0);
-      return;
+        return;
     }
     err_position = abs(err_position);
 
@@ -285,13 +273,13 @@ void position_handling(void) {
     if(stopTime == 0){
       stopTime_real = 1000;     //default on uninitialized stopTime
     }else{
-      stopTime_real = stopTime * speed_freewheel/speed_h * speed_freewheel/speed_h; //* change of speed squared
+      stopTime_real = stopTime * bldc_cm->speed_freewheel/bldc_cm->speed * bldc_cm->speed_freewheel/bldc_cm->speed; //* change of speed squared
     }
 
-    speed_real = (ZEROSPEED * 100)/speed_h; // period converted to speed
+    speed_real = (ZEROSPEED * 100)/bldc_cm->speed; // period converted to speed
 
-    if((err_position * speed_h < (stopTime_real) ) && !stop_started && (!ButtonStatus) && //speed_h  je perioda (1/v), za manj racunanja
-    		(!(bldc_cm->ctrl & BLDC_CTRL_HOMING && !(bldc_cm->state & BLDC_MOTOR_STATE_DC_B_MOTOR))) && (!(bldc_cm->ctrl & BLDC_CTRL_HOMING_B && bldc_cm->state & BLDC_MOTOR_STATE_DC_B_MOTOR)) ) // Dont stop when homing
+    if(((err_position * bldc_cm->speed / 10 )< (stopTime_real) ) && !stop_started && (!ButtonStatus) && //speed  je perioda (1/v), za manj racunanja
+    		(!(bldc_cm->ctrl & BLDC_CTRL_HOMING ))  ) // Dont stop when homing
     { 
       stop_started = 1;
       speed_onStart = speed_real;
@@ -303,22 +291,15 @@ void position_handling(void) {
 
       if(stopTime == 0 && was_full_speed_move){    //Measure stop time on 1st stop
         if(stopTime_cnt == 0){ // Measure freewheel speed on start of stoping time measurement
-          speed_freewheel = speed_h;
+        	bldc_cm->speed_freewheel = bldc_cm->speed;
         }
         motor_accelerate(0);
-        destination_A = position_A;
-        destination_B = position_B;
+        bldc_cm->target = bldc_cm->position;
         stopTime_cnt ++;
-        if(speed_h == ZEROSPEED){
+        if(bldc_cm->speed == ZEROSPEED){
           stopTime = stopTime_cnt;
-          if (!(bldc_cm->state & BLDC_MOTOR_STATE_DC_B_MOTOR)){
-            MotorA_ramp = stopTime /10;
-            speed_freewheelA = speed_freewheel;
-          }
-          else{
-            MotorB_ramp = stopTime /10;
-            speed_freewheelB = speed_freewheel;
-          }
+          bldc_cm->ramp = stopTime /10;
+          //bldc_cm->speed_freewheel = speed_freewheel;
         }
         return;
       }
@@ -326,7 +307,7 @@ void position_handling(void) {
       stopTime_cnt = 0;
 
       //HARD ACTIVE BRAKING
-      if(err_position < 1 || brakeStarted ||   (err_position <= 2 && (speed_h < speed_freewheel*6 || OneHallUsed)) ){ 
+      if(err_position < 1 || brakeStarted ||   (err_position <= 2 && (bldc_cm->speed < bldc_cm->speed_freewheel*6 || OneHallUsed)) ){
         motor_brake(PWM_MAX_NEG); //Hard braking
         brakeStarted = 1;
         //destination_A = position_A;
@@ -334,7 +315,7 @@ void position_handling(void) {
         return;
       }
 
-      if(speed_h == ZEROSPEED){ // if motor stopped before destination is reached
+      if(bldc_cm->speed == ZEROSPEED){ // if motor stopped before destination is reached
         stop_timeout = 320;
         motor_accelerate(0); //turn-off PWM
         return;
@@ -411,16 +392,46 @@ void position_handling(void) {
 #define getHallStateB1(motorIndex) (motorIndex ? HAL_GPIO_ReadPin(HALL_A3_GPIO_Port, HALL_A3_Pin ) : HAL_GPIO_ReadPin(HALL_B3_GPIO_Port, HALL_B3_Pin ))
 #define getHallStateB2(motorIndex) (motorIndex ? HAL_GPIO_ReadPin(END_SW_A_HI_GPIO_Port, END_SW_A_HI_Pin ) : HAL_GPIO_ReadPin(END_SW_B_HI_GPIO_Port, END_SW_B_HI_Pin ))
 
+GPIO_PinState getHallState1(unsigned char index){
+	switch(index)
+	{
+	case 0:
+		return HAL_GPIO_ReadPin(HALL_A1_GPIO_Port, HALL_A1_Pin);
+	case 1:
+		return HAL_GPIO_ReadPin(HALL_A3_GPIO_Port, HALL_A3_Pin);
+	case 2:
+		return HAL_GPIO_ReadPin(HALL_B1_GPIO_Port, HALL_B1_Pin);
+	case 3:
+		return HAL_GPIO_ReadPin(HALL_B3_GPIO_Port, HALL_B3_Pin);
+	default: return 0;
+	}
+}
+
+GPIO_PinState getHallState2(unsigned char index){
+	switch(index)
+	{
+	case 0:
+		return HAL_GPIO_ReadPin(HALL_A2_GPIO_Port, HALL_A2_Pin);
+	case 1:
+		return HAL_GPIO_ReadPin(END_SW_A_HI_GPIO_Port, END_SW_A_HI_Pin);
+	case 2:
+		return HAL_GPIO_ReadPin(HALL_B2_GPIO_Port, HALL_B2_Pin);
+	case 3:
+		return HAL_GPIO_ReadPin(END_SW_B_HI_GPIO_Port, END_SW_B_HI_Pin);
+	default: return 0;
+	}
+}
+
 
 void DC_QuadEncoder(void){
 	//----------A-MOTOR Fast Hall Read
 	  if (!(bldc_cm->state & BLDC_MOTOR_STATE_DC_B_MOTOR) || (bldc_cm->state & BLDC_MOTOR_STATE_DC_AB_MOTOR) ){
 	    if((hall_enable & 0x03) == 0x03 || (hall_enable & 0x03) == 0x01) { //Read motor speed 4x per turn
 	      //----- Hall A1 -----
-	      if (getHallStateA1(bldc_cm->index) == GPIO_PIN_SET) {  				// *** hall 1 = 1 ***
+	      if (getHallState1(bldc_cm->index) == GPIO_PIN_SET) {  				// *** hall 1 = 1 ***
 	        if(hallState_prev_A1 == 0){
-	          if(hallCnt1A_S > (speed_h/2) || (++debounce_cntA > HALL_DEBOUNCE)){ //FILTER: ignore too short pulses, or deounce counter
-	            speed_h = hallCnt1A_S;     //South pole magnet counter
+	          if(hallCnt1A_S > (bldc_cm->speed/2) || (++debounce_cntA > HALL_DEBOUNCE)){ //FILTER: ignore too short pulses, or deounce counter
+	        	bldc_cm->speed = hallCnt1A_S;     //South pole magnet counter
 	            HallCnt1A++;
 	            hallCnt1A_S = 0;
 	            A_enc_new |= (1<<0);
@@ -433,8 +444,8 @@ void DC_QuadEncoder(void){
 	        }
 	      } else {                         				// *** hall 1 = 0 ***
 	        if(hallState_prev_A1 == 1){
-	          if(hallCnt1A_N > (speed_h/2) || (++debounce_cntA > HALL_DEBOUNCE)){ //ignore too short pulses (debouncing)
-	            speed_h = hallCnt1A_N;     //North pole magnet counter
+	          if(hallCnt1A_N > (bldc_cm->speed/2) || (++debounce_cntA > HALL_DEBOUNCE)){ //ignore too short pulses (debouncing)
+	        	bldc_cm->speed = hallCnt1A_N;     //North pole magnet counter
 	            hallCnt1A_N = 0;
 	            A_enc_new &= ~(1<<0);
 	            debounce_cntA = 0;
@@ -449,17 +460,17 @@ void DC_QuadEncoder(void){
 	    if(hallCnt1A_S < ZEROSPEED)
 	      hallCnt1A_S++;
 	    else
-	      speed_h = ZEROSPEED;
+	      bldc_cm->speed = ZEROSPEED;
 	    if(hallCnt1A_N < ZEROSPEED)
 	      hallCnt1A_N++;
 	    }
 
 	    if((hall_enable & 0x03) == 0x03 || (hall_enable & 0x03) == 0x02) {
 	      //----- Hall A2 -----
-	      if (getHallStateA2(bldc_cm->index) == GPIO_PIN_SET) { 				// *** hall 1 = 1 ***
+	      if (getHallState2(bldc_cm->index) == GPIO_PIN_SET) { 				// *** hall 1 = 1 ***
 	        if(hallState_prev_A2 == 0){
-	          if(hallCnt2A_S > (speed_h/2) || (++debounce_cntA > HALL_DEBOUNCE)){ //ignore too short pulses (debouncing)
-	            speed_h = hallCnt2A_S;     //South pole magnet counter
+	          if(hallCnt2A_S > (bldc_cm->speed/2) || (++debounce_cntA > HALL_DEBOUNCE)){ //ignore too short pulses (debouncing)
+	        	bldc_cm->speed = hallCnt2A_S;     //South pole magnet counter
 	            hallCnt2A_S = 0;
 	            HallCnt1B++;
 	            A_enc_new |= (1<<1);
@@ -472,8 +483,8 @@ void DC_QuadEncoder(void){
 	        }
 	      } else {                         				// *** hall 1 = 0 ***
 	        if(hallState_prev_A2 == 1){
-	          if(hallCnt1A_N > (speed_h/2) || (++debounce_cntA > HALL_DEBOUNCE)){ //ignore too short pulses (debouncing)
-	            speed_h = hallCnt2A_N;     //North pole magnet counter
+	          if(hallCnt1A_N > (bldc_cm->speed/2) || (++debounce_cntA > HALL_DEBOUNCE)){ //ignore too short pulses (debouncing)
+	        	bldc_cm->speed = hallCnt2A_N;     //North pole magnet counter
 	            hallCnt2A_N = 0;
 	            A_enc_new &= ~(1<<1);
 	            debounce_cntA = 0;
@@ -487,93 +498,12 @@ void DC_QuadEncoder(void){
 	    if(hallCnt2A_S < ZEROSPEED)
 	      hallCnt2A_S++;
 	    else
-	      speed_h = ZEROSPEED;
+	      bldc_cm->speed = ZEROSPEED;
 	    if(hallCnt2A_N < ZEROSPEED)
 	      hallCnt2A_N++;
 	    }
 	  }
 
-	  //----------B-MOTOR Fast Hall Read
-	  else if (bldc_cm->state & BLDC_MOTOR_STATE_DC_B_MOTOR){
-	    if(((hall_enable & 0x03<<16) == 0x03<<16) || ((hall_enable & 0x03<<16) == 0x01<<16)) { //Read motor speed 4x per turn
-	      //----- Hall B1 -----
-	      if (getHallStateB1(bldc_cm->index) == GPIO_PIN_SET) { 				// *** hall 1 = 1 ***
-	        if(hallState_prev_B1 == 0){
-	          if(hallCnt1A_S > (speed_h/2) || (++debounce_cntB > HALL_DEBOUNCE)){ //ignore too short pulses (debouncing)
-	            speed_h = hallCnt1A_S;     //South pole magnet counter
-	            hallCnt1A_S = 0;
-	            HallCnt2A++;
-	            B_enc_new |= (1<<0);
-	            debounce_cntB = 0;
-	            hallState_prev_B1 = 1;
-	          }
-	        }
-	        else{ //hallState_prev_B1 == 1
-	          debounce_cntB--;
-	        }
-	      } else {                         				// *** hall 1 = 0 ***
-	        if(hallState_prev_B1 == 1){
-	          if(hallCnt1A_N > (speed_h/2) || (++debounce_cntB > HALL_DEBOUNCE)){ //ignore too short pulses (debouncing)
-	            speed_h = hallCnt1A_N;     //North pole magnet counter
-	            hallCnt1A_N = 0;
-	            B_enc_new &= ~(1<<0);
-	            debounce_cntB = 0;
-	            hallState_prev_B1 = 0;
-	          }
-	        }
-	        else{ //hallState_prev_B1 == 0
-	          debounce_cntB--;
-	        }
-	      }
-
-	    if(hallCnt1A_S < ZEROSPEED)
-	      hallCnt1A_S++;
-	    else
-	      speed_h = ZEROSPEED;
-	    if(hallCnt1A_N < ZEROSPEED)
-	      hallCnt1A_N++;
-
-	    }
-
-	    if(((hall_enable & 0x03<<16) == 0x03<<16) || ((hall_enable & 0x03<<16) == 0x02<<16)) {
-	      //----- Hall B2 -----
-	      if (getHallStateB2(bldc_cm->index) == GPIO_PIN_SET) {  				// *** hall 1 = 1 ***
-	        if(hallState_prev_B2 == 0){
-	          if(hallCnt2A_S > (speed_h/2) || (++debounce_cntB > HALL_DEBOUNCE)){ //ignore too short pulses (debouncing)
-	            speed_h = hallCnt2A_S;     //South pole magnet counter
-	            hallCnt2A_S = 0;
-	            HallCnt2B++;
-	            B_enc_new |= (1<<1);
-	            debounce_cntB = 0;
-	            hallState_prev_B2 = 1;
-	          }
-	        }
-	        else{ //hallState_prev_B2 == 1
-	          debounce_cntB--;
-	        }
-	      } else {                         				// *** hall 1 = 0 ***
-	        if(hallState_prev_B2 == 1){
-	          if(hallCnt1A_N > (speed_h/2) || (++debounce_cntB > HALL_DEBOUNCE)){ //ignore too short pulses (debouncing)
-	            speed_h = hallCnt2A_N;     //North pole magnet counter
-	            hallCnt2A_N = 0;
-	            B_enc_new &= ~(1<<1);
-	            debounce_cntB = 0;
-	            hallState_prev_B2 = 0;
-	          }
-	        }
-	        else{ //hallState_prev_B2 == 0
-	          debounce_cntB--;
-	        }
-	      }
-	      if(hallCnt2A_S < ZEROSPEED)
-	        hallCnt2A_S++;
-	      else
-	        speed_h = ZEROSPEED;
-	      if(hallCnt2A_N < ZEROSPEED)
-	        hallCnt2A_N++;
-
-	    }
-	  }
 
 	/********************************************
 	    pulse count on A axis ---
@@ -601,17 +531,17 @@ void DC_QuadEncoder(void){
 	    switch (A_enc_temp){                                          // direction
 	      case 0: break;                                              // 00 = no change
 	      case 1: {
-	        if(!(Hall_CntDown&1))
-	          position_A++;                                           // 01 = up
+	        if(!(bldc_GetInvertHall(bldc_cm->index)))
+	        	bldc_cm->position++;                                           // 01 = up
 	          else
-	            position_A--;
+	        	bldc_cm->position--;
 	          break;
 	      }
 	      case 2: {                                                   // 10 = down
-	        if(!(Hall_CntDown&1))
-	          position_A--;                                           // 01 = up
+	    	  if(!(bldc_GetInvertHall(bldc_cm->index)))
+	        	bldc_cm->position--;                                           // 01 = up
 	        else
-	          position_A++;
+	        	bldc_cm->position++;
 	        break;
 	      }
 	      case 3:
@@ -624,101 +554,22 @@ void DC_QuadEncoder(void){
 
 	      if(first_movingA == 1) {
 	        first_movingA = 0;
-	        if (destination_A < position_A || (bldc_cm->ctrl & BLDC_CTRL_HOMING))
+	        if (bldc_cm->target < bldc_cm->position || (bldc_cm->ctrl & BLDC_CTRL_HOMING))
 	          moving_dirA = 0;
-	        else if(destination_A > position_A)
+	        else if(bldc_cm->target > bldc_cm->position)
 	          moving_dirA = 1;
 	      }
 
 	      if(moving_dirA == 1)
-	        position_A += 2;
+	    	  bldc_cm->position += 2;
 	      else if (moving_dirA == 0)
-	        position_A -= 2;
+	    	  bldc_cm->position -= 2;
 	    }
 
 	    A_enc_old = A_enc_new;
 	    OneHallUsed = 1;
 	  }
 
-
-	/********************************************
-	    pulse count on B axis ---
-	*********************************************/
-	  if((hall_enable & 0x03<<16) == 0x03<<16) {
-	    switch (B_enc_old) {                                         // swap bits  0...0000 00xx
-	      case 0:
-	        B_enc_temp=0;
-	        break;
-	      case 1:
-	        B_enc_temp=2;
-	        break;
-	      case 2:
-	        B_enc_temp=1;
-	        break;
-	      case 3:
-	        B_enc_temp=3;
-	        break;
-	    }
-	  //--------------------
-	    B_enc_old = B_enc_new;        //new->old
-	    B_enc_temp ^= B_enc_new;      //swapped_old EXOR new
-	  //    BKP_WriteBackupRegister(BKP_DR6,H_enc_old);	            //backup - da reset virtualno ne steje impulza
-
-	    switch (B_enc_temp) {                                         // direction
-	      case 0:
-	        break;                                                    // 00 = no change
-	      case 1: {
-	        if(!(Hall_CntDown&2))
-	          position_B++;                                           // 01 = up
-	        else
-	          position_B--;                                           // 01 = up
-	        break;
-	      }
-	      case 2: {                                                   // 10 = down
-	        if(!(Hall_CntDown&2))
-	          position_B--;                                           // 01 = up
-	        else
-	          position_B++;
-	        break;
-	      }
-	      case 3:
-	        break;                                                    // 11 = no change
-	    }
-	  }
-
-	  if(((hall_enable & 0x03<<16) == 0x01<<16) || ((hall_enable & 0x03<<16) == 0x02<<16)) {
-	    if(B_enc_new != B_enc_old) {
-
-	      if(first_movingB == 1) {
-	        first_movingB = 0;
-	        if (destination_B < position_B || (bldc_cm->ctrl & BLDC_CTRL_HOMING_B))
-	          moving_dirB = 0;
-	        else if(destination_B > position_B)
-	          moving_dirB = 1;
-	      }
-	      if(moving_dirB == 1)
-	        position_B += 2;
-	      else if (moving_dirB == 0)
-	        position_B -= 2;
-	    }
-	    B_enc_old = B_enc_new;
-	    OneHallUsed = 1;
-	  }
-
-	  if(((hall_enable & 0x03) == 0x01) || ((hall_enable & 0x03) == 0x02) ||
-	    ((hall_enable & 0x03<<16) == 0x01<<16) || ((hall_enable & 0x03<<16) == 0x02<<16)
-	    ) {
-	    if (move_direction == 0) {
-	      countMoving++;
-	      if(countMoving > 8000) {
-	        first_movingA = 1;
-	        first_movingB = 1;
-	        moving_dirA = 0;
-	        moving_dirB = 0;
-	        countMoving = 0;
-	      }
-	    }
-	  }
 }
 
 

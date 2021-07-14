@@ -396,6 +396,7 @@ int main(void)
   MX_USART2_UART_Init();
   MX_SPI3_Init();
   MX_USART3_UART_Init();
+  MX_TIM6_Init();
   /* USER CODE BEGIN 2 */
 
   int LoadDefaults = 0;
@@ -501,7 +502,6 @@ int main(void)
 	     if (systick_ms != 1)
 	       continue;
 	     systick_ms=0;       // execute every 1ms
-	     position_handling();
 
 	     //SEGGER_RTT_printf(0, "main period:%d\r\n", systick_count -systick_count_prev);
 	     //systick_count_prev = systick_count;

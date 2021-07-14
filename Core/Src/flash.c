@@ -156,12 +156,10 @@ void flash_read (unsigned int read_address) {
   m->home_offset              = flash_backup[29];
   m->end_switchDetect         = flash_backup[30];
 
-  m->pid.pgain                = flash_backup[31];
-  m->pid.igain                = flash_backup[32]; 
-  m->pid.dgain                = flash_backup[33];
-  m->pid.deadband             = flash_backup[34];
+  m->ramp               	  = flash_backup[31];
+  m->speed_freewheel          = flash_backup[32];
 
-#if BLDC_MOTOR_COUNT == 2
+#if BLDC_MOTOR_COUNT > 1
   // Motor B driving settings
   bldc_motor *mb = bldc_Motor(1);
 
@@ -185,10 +183,9 @@ void flash_read (unsigned int read_address) {
   mb->home_offset              = flash_backup[50];
   mb->end_switchDetect         = flash_backup[51];
   
-  mb->pid.pgain                = flash_backup[52];
-  mb->pid.igain                = flash_backup[53];
-  mb->pid.dgain                = flash_backup[54];
-  mb->pid.deadband             = flash_backup[55];
+  mb->ramp                	   = flash_backup[52];
+  mb->speed_freewheel          = flash_backup[53];
+
 #endif
   //longitude                    = flash_backup[57];
   //latitude                     = flash_backup[67];
@@ -411,22 +408,16 @@ int flash_write(unsigned int write_address) {
     upgrExe = 1;
   }
 
-  if(flash_backup[31] != m->pid.pgain) {
-    flash_backup[31] = m->pid.pgain;
+  if(flash_backup[31] != m->ramp) {
+    flash_backup[31] = m->ramp;
     upgrExe = 1;
   }
-  if(flash_backup[32] != m->pid.igain) {
-    flash_backup[32] = m->pid.igain;
+
+  if(flash_backup[32] != m->speed_freewheel) {
+    flash_backup[32] = m->speed_freewheel;
     upgrExe = 1;
   }
-  if(flash_backup[33] != m->pid.dgain) {
-    flash_backup[33] = m->pid.dgain;
-    upgrExe = 1;
-  }
-  if(flash_backup[34] != (float)m->pid.deadband) {
-    flash_backup[34] = m->pid.deadband;
-    upgrExe = 1;
-  }
+
 
 //#if BLDC_MOTOR_COUNT == 2
   // Motor B driving settings
@@ -500,20 +491,12 @@ int flash_write(unsigned int write_address) {
     upgrExe = 1;
   }
   
-  if(flash_backup[52] != mb->pid.pgain) {
-    flash_backup[52] = mb->pid.pgain;
+  if(flash_backup[52] != mb->ramp) {
+    flash_backup[52] = mb->ramp;
     upgrExe = 1;
   }
-  if(flash_backup[53] != mb->pid.igain) {
-    flash_backup[53] = mb->pid.igain;
-    upgrExe = 1;
-  }
-  if(flash_backup[54] != mb->pid.dgain) {
-    flash_backup[54] = mb->pid.dgain;
-    upgrExe = 1;
-  }
-  if(flash_backup[55] != (float)mb->pid.deadband) {
-    flash_backup[55] = mb->pid.deadband;
+  if(flash_backup[53] != mb->speed_freewheel) {
+    flash_backup[53] = mb->speed_freewheel;
     upgrExe = 1;
   }
 //#endif

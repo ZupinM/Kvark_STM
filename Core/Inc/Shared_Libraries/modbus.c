@@ -183,7 +183,14 @@ void modbus_cmd() {
 
     crc_calc = modbus_crc((uint8_t *)UARTBuffer0, UARTCount0, CRC_NORMAL);
 
-    if (crc_calc == 0) {
+	  if (crc_calc != 0){
+		  if(crc_errors % 0x10000 == 0xFFFF)
+			crc_errors = (crc_errors / 0x10000) * 0x10000; // reset counter, only keep upper 4 bytes (checksum erors)
+
+		  crc_errors++;
+		  UARTCount0 = 0;
+		  return;
+	  }
       if(transceiver == NONE)
         baudrate_timeout = 1;
       rxcnt = UARTCount0 - 2;
@@ -196,7 +203,6 @@ void modbus_cmd() {
       if(LoRa_info_response((uint8_t*) UARTBuffer0, &number_TX_bytes0)){
         goto TX;
       }
-      else {
 
 //////////////////////////////////////////****NANO RESPONSE*****////////////////////////////////////////////////
       switch (UARTBuffer0[1]) {
@@ -302,100 +308,6 @@ void modbus_cmd() {
             backup_timeout = 200;                     //4 sekundi zatem backup v flash
           }			 
           break;	
-        }
-        case MCMD_R_Bldc_PA: {		
-          number_TX_bytes0 = mcmd_read_float(bldc_Motor(0)->pid.pgain, (char *)UARTBuffer0);
-          break;		
-        }
-        case MCMD_R_Bldc_IA: {		
-          number_TX_bytes0 = mcmd_read_float(bldc_Motor(0)->pid.igain, (char *)UARTBuffer0);
-          break;		
-        }
-        case MCMD_R_Bldc_DA: {		
-          number_TX_bytes0 = mcmd_read_float(bldc_Motor(0)->pid.dgain, (char *)UARTBuffer0);
-          break;		
-        }
-        case MCMD_W_Bldc_PA: {
-          Ftemp = mcmd_write_limit_float (0.001, 10.0, 0);
-          if (m_ack_state == 0) {
-            bldc_Motor(0)->pid.pgain = Ftemp;
-          }
-          break;
-        }
-        case MCMD_W_Bldc_IA: {
-          Ftemp = mcmd_write_limit_float (0.000001, 1.0, 0);
-          if (m_ack_state == 0) {
-            bldc_Motor(0)->pid.igain = Ftemp;
-          }
-          break;
-        }
-        case MCMD_W_Bldc_DA: {
-          Ftemp = mcmd_write_limit_float (0.001, 10.0, 0);
-          if (m_ack_state == 0) {
-            bldc_Motor(0)->pid.dgain = Ftemp;
-          }
-          break;
-        }
-#if BLDC_MOTOR_COUNT == 2
-        case MCMD_R_Bldc_PB: {		
-          number_TX_bytes0 = mcmd_read_float(bldc_Motor(1)->pid.pgain, (char *)UARTBuffer0);
-          break;		
-        }
-        case MCMD_R_Bldc_IB: {		
-          number_TX_bytes0 = mcmd_read_float(bldc_Motor(1)->pid.igain, (char *)UARTBuffer0);
-          break;		
-        }
-        case MCMD_R_Bldc_DB: {		
-          number_TX_bytes0 = mcmd_read_float(bldc_Motor(1)->pid.dgain, (char *)UARTBuffer0);
-          break;		
-        }
-        case MCMD_W_Bldc_PB: {
-          Ftemp = mcmd_write_limit_float (0.001, 10.0, 0);
-          if (m_ack_state == 0) {
-            bldc_Motor(1)->pid.pgain = Ftemp;
-          }
-          break;
-        }
-        case MCMD_W_Bldc_IB: {
-          Ftemp = mcmd_write_limit_float (0.000001, 1.0, 0);
-          if (m_ack_state == 0) {
-            bldc_Motor(1)->pid.igain = Ftemp;
-          }
-          break;
-        }
-        case MCMD_W_Bldc_DB: {
-          Ftemp = mcmd_write_limit_float (0.001, 10.0, 0);
-          if (m_ack_state == 0) {
-            bldc_Motor(1)->pid.dgain = Ftemp;
-          }
-          break;
-        }
-#endif
-        case MCMD_R_Bldc_Deadband: {
-          read_int_buf[0] = bldc_Motor(0)->pid.deadband | (bldc_Motor(1)->pid.deadband << 16);
-          number_TX_bytes0 = mcmd_read_int(1, slave_addr);
-          break;
-        }
-        case MCMD_W_Bldc_Deadband: {
-
-          Utemp = mcmd_write_int1();
-          unsigned int dbA =  Utemp & 0xFFFF;
-          unsigned int dbB =  (Utemp >> 16) & 0xFFFF;
-
-          if (dbA <= 0)
-            dbA = 1;
-          if (dbB <= 0)
-            dbB = 1;
-
-          if (dbA <= 100 && dbB <= 100) {
-            bldc_Motor(0)->pid.deadband = dbA;
-            bldc_Motor(1)->pid.deadband = dbB;
-            ack_reply();
-          }
-          else
-            err_reply();
-
-          break;
         }
 
         // SERIAL NUMBERS
@@ -1282,35 +1194,32 @@ void modbus_cmd() {
           break;
         }
 
-        case MCMD_R_RampA:
-          m_ack_state = MACK_UNRECOGNIZED_CMD;
-          err_reply();
-          //number_TX_bytes0 = mcmd_read_float(MotorA_ramp);
+        case MCMD_R_RampA:{
+          number_TX_bytes0 = mcmd_read_float(bldc_motors[0].ramp, (char *)UARTBuffer0);
           break;
-        case MCMD_W_RampA:
-          m_ack_state=MACK_UNRECOGNIZED_CMD;
-          err_reply();
-        /*  Ftemp = mcmd_write_float(-5000,5000);		 //omejitev vpisa
+        }
+        case MCMD_W_RampA:{
+          Ftemp = mcmd_write_float(-5000,5000);		 //omejitev vpisa
+          bldc_motors[0].ramp=Ftemp;
           if (m_ack_state==0) {
-                  MotorA_ramp=Ftemp;
+                  bldc_motors[0].ramp=Ftemp;
                   backup_timeout=200;				//4 sekundi zatem backup v flash
-          }*/
+          }
           break;
-#if BLDC_MOTOR_COUNT == 2
-        case MCMD_R_RampB:
-          m_ack_state = MACK_UNRECOGNIZED_CMD;
-          err_reply();
-          //number_TX_bytes0 = mcmd_read_float(MotorB_ramp);
+        }
+#if BLDC_MOTOR_COUNT > 1
+        case MCMD_R_RampB:{
+          number_TX_bytes0 = mcmd_read_float(bldc_motors[1].ramp, (char *)UARTBuffer0);
           break;
-        case MCMD_W_RampB:
-          m_ack_state = MACK_UNRECOGNIZED_CMD;
-          err_reply();
-        /*  Ftemp = mcmd_write_float(-5000,5000);		 //omejitev vpisa
+        }
+        case MCMD_W_RampB:{
+          Ftemp = mcmd_write_float(-5000,5000);		 //omejitev vpisa
           if (m_ack_state==0) {
-                  MotorB_ramp=Ftemp;
+        	  bldc_motors[1].ramp=Ftemp;
                   backup_timeout=200;				//4 sekundi zatem backup v flash
-          }*/
+          }
           break;
+        }
 #endif
         //*** 	NOT RECOGNIZED COMMAND	***
         default: {
@@ -1320,7 +1229,6 @@ void modbus_cmd() {
         }
       }
       UARTCount0 = 0;
-    }
                                             //--^--//
 ////////////////////////////////////////****NANO RESPONSE*****////////////////////////////////////////////////
 
@@ -1367,14 +1275,6 @@ void modbus_cmd() {
         //LPC_WWDT->FEED = 0x50;		//napacna sekvenca = takojsen reset
        // while(1);    			//cakaj na wdt reset 
       }
-
-    } else {
-      if(crc_errors % 0x10000 == 0xFFFF)
-        crc_errors = (crc_errors / 0x10000) * 0x10000; // reset counter, only keep upper 4 bytes (checksum erors)
-
-      crc_errors++;
-      UARTCount0 = 0;
-    }
   }
   else if(transceiver == XBEE && UARTBuffer0[0] != slave_addr) {
     UARTSend( (uint8_t *)UARTBuffer0, UARTCount0);

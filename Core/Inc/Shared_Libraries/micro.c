@@ -9,7 +9,6 @@
 /***********************************************************
   CHECK TIME
 ************************************************************/
-extern bldc_motor bldc_motors[BLDC_MOTOR_COUNT];
 //extern bldc_motor *bldc_cm;
 extern uint8_t usb_drive;
 extern uint32_t systick_count;

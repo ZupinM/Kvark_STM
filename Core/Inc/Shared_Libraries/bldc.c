@@ -61,7 +61,6 @@ const unsigned char dc_ccw_next[8] = {0, 0, 0, 0, 6, 4, 7, 5};
 //const 
 
 #include "bldc.h"
-#include "pid.h"
 #include "../main.h"
 #include "../flash.h"
 #include "../tim.h"
@@ -116,8 +115,7 @@ extern uint32_t cflags;
 
 extern uint32_t SystemCoreClock;
 
-unsigned int direction_delay = 0;
-unsigned int moving_counter[2] = {0, 0};
+unsigned int moving_counter[4] = {0, 0, 0, 0};
 unsigned char any_motor_moving = 0;
 
 
@@ -213,17 +211,19 @@ void bldc_init_motors(int LoadDefaults)
       bldc_motors[i].Idetection      = 0.07;
       bldc_motors[i].end_switchDetect = 10;
 
+      bldc_motors[i].speed_freewheel = ZEROSPEED / 10;
+      bldc_motors[i].speed = ZEROSPEED;
+      bldc_motors[i].speed_old = ZEROSPEED;
+      bldc_motors[i].ramp = 800;
+
       //init hall state
       bldc_motors[i].hall_state = bldc_ReadHall((unsigned char)i);
 
-      //init PID
-      pid_init(&bldc_motors[i].pid, &bldc_motors[i].position, &bldc_motors[i].target);
-      pid_tune(&bldc_motors[i].pid, 0.1, 0.00001 , 0, BLDC_DEAD_BAND);
-      //pid_setinteg(&bldc_motors[i].pid, 0.0);
-      pid_bumpless(&bldc_motors[i].pid);
     }
   } else {
     for(int i=0 ;i < BLDC_MOTOR_COUNT; i++) {  
+      bldc_motors[i].speed = ZEROSPEED;
+      bldc_motors[i].speed_old = ZEROSPEED;
       bldc_motors[i].index           = i;
       bldc_motors[i].ctrl            = BLDC_CTRL_IDLE;
       bldc_motors[i].status          &= 0xf0 | BLDC_STATUS_ENDSWITCH_ERROR | BLDC_STATUS_ERR_MOVEOUT; 
@@ -270,15 +270,6 @@ void bldc_init_motors(int LoadDefaults)
       if(!isnormal(bldc_motors[i].I_Inrush_time))
         bldc_motors[i].I_Inrush_ratio = 500;
 
-      //pid sanity check
-      if(!isnormal(bldc_motors[i].pid.pgain))
-        bldc_motors[i].pid.pgain = 0.1;
-      if(!isnormal(bldc_motors[i].pid.igain))
-        bldc_motors[i].pid.igain = 1/100000;
-      if(!isnormal(bldc_motors[i].pid.dgain))
-        bldc_motors[i].pid.dgain = 0;
-      if(bldc_motors[i].pid.deadband>100)
-        bldc_motors[i].pid.deadband = BLDC_DEAD_BAND;
       
       if(number_of_poles < 1 || number_of_poles > 100)
         number_of_poles = 1;
@@ -288,9 +279,6 @@ void bldc_init_motors(int LoadDefaults)
 
       bldc_motors[i].target = bldc_motors[i].position;
 
-      pid_init(&bldc_motors[i].pid, &bldc_motors[i].position, &bldc_motors[i].target);
-      pid_setinteg(&bldc_motors[i].pid, 0.0);
-      pid_bumpless(&bldc_motors[i].pid);
     }
 
     bldc_status &= ~(BLDC_LOCKED | BLDC_MOTOR_CUTOFF);
@@ -444,12 +432,12 @@ int bldc_setPosition(unsigned char motor, float newpos, int windmode) { //go to 
     bldc_cm->status &= ~BLDC_STATUS_WIND_MODE;
 
 
-   //switch motors immediately after send (current motor is not moving)
+ /*  //switch motors immediately after send (current motor is not moving)
 #if BLDC_MOTOR_COUNT > 1
     if( (target_error(bldc_cm->index) < (bldc_cm->pid.deadband * 5)) && (target_error(OTHER_MOTOR(bldc_cm->index)) > (bldc_cm->pid.deadband * 5)) && (!any_motor_moving)){
         bldc_cm = &bldc_motors[OTHER_MOTOR(bldc_cm->index)];
     }
-#endif
+#endif*/
 
   Flag_check();
   return  0;
@@ -766,9 +754,9 @@ void Flag_check() {
 
     val = (bldc_motors[i].target - bldc_motors[i].position);
 
-    if(val >= (-bldc_motors[i].pid.deadband -bounce_stop) && val <= (bldc_motors[i].pid.deadband + bounce_stop))
+    /*if(val >= (-bldc_motors[i].pid.deadband -bounce_stop) && val <= (bldc_motors[i].pid.deadband + bounce_stop))
       bldc_motors[i].status &= ~(BLDC_STATUS_MOVING_OUT | BLDC_STATUS_MOVING_IN);
-    else if(bldc_motors[i].status & BLDC_STATUS_MOVING) {
+    else*/ if(bldc_motors[i].status & BLDC_STATUS_MOVING) {
       if(val>0) {
 
         bldc_motors[i].status |= BLDC_STATUS_MOVING_OUT;
@@ -1116,7 +1104,7 @@ void bldc_process() {
 
   
 
-
+/*
 //switch motors when current motor is finished
     if( (target_error(bldc_cm->index) < (bldc_cm->pid.deadband * 5)) && (target_error(OTHER_MOTOR(bldc_cm->index)) > (bldc_cm->pid.deadband * 5)) && (!any_motor_moving)){
         bldc_Stop(0);
@@ -1125,7 +1113,7 @@ void bldc_process() {
         bldc_cm = &bldc_motors[OTHER_MOTOR(bldc_cm->index)];
         bldc_cm->ctrl = BLDC_CTRL_TRACKING;
 #endif
-    }
+    }*/
 
   voltage_detection();
   Flag_check();
@@ -1266,15 +1254,16 @@ void bldc_process() {
   //motor_ramp();
 
 
-  //if(!direction_delay)
-  /*if((bldc_pwm > 0) && !(any_motor_moving && bldc_cm->status&BLDC_STATUS_CCW)) {
+  int err_p = bldc_cm->target - bldc_cm->position;
+
+  if((err_p > 0) && !(any_motor_moving && bldc_cm->status&BLDC_STATUS_CCW)) {
     bldc_cm->status &= ~BLDC_STATUS_CCW;
     ActivateDrivers(1);
-    bldc_update_pwm(bldc_pwm);
-  }else if((bldc_pwm < 0) && !(any_motor_moving && !(bldc_cm->status&BLDC_STATUS_CCW))) {
+    //bldc_update_pwm(bldc_pwm);
+  }else if((err_p < 0) && !(any_motor_moving && !(bldc_cm->status&BLDC_STATUS_CCW))) {
     bldc_cm->status |= BLDC_STATUS_CCW;
     ActivateDrivers(-1);
-    bldc_update_pwm(-bldc_pwm); 
+    //bldc_update_pwm(-bldc_pwm);
   } else {  //deactivate drivers
     bldc_idletime++;
     if(bldc_idletime>=100) {
@@ -1282,7 +1271,7 @@ void bldc_process() {
       bldc_cm->ctrl = BLDC_CTRL_IDLE;  
       ActivateDrivers(0);
     }
-  } */
+  }
 
 }
 
@@ -1319,7 +1308,7 @@ void dc_process() {
     }	
   }
 
-
+/*
 //switch motors when current motor is finished	
 #if BLDC_MOTOR_COUNT > 1	
   if( (target_error(bldc_cm->index) < (bldc_cm->pid.deadband * 5)) && (target_error(OTHER_MOTOR(bldc_cm->index)) > (bldc_cm->pid.deadband * 5)) && (!any_motor_moving)){	
@@ -1328,7 +1317,7 @@ void dc_process() {
     bldc_cm = &bldc_motors[OTHER_MOTOR(bldc_cm->index)];	
     bldc_cm->ctrl = BLDC_CTRL_TRACKING;	
   }	
-#endif	
+#endif	*/
   voltage_detection();	
   Flag_check();	
  // bldc_motor *bldc_cm = &bldc_motors[1];	
@@ -1441,11 +1430,7 @@ void dc_process() {
 
   //motor_rampDC();
 
-  if((bldc_pwm > 0) && !any_motor_moving && bldc_cm->ctrl != BLDC_CTRL_STOP) {
-
-    ActivateDrivers(1);
-
-  } else if (!any_motor_moving) {  //deactivate drivers
+  if (!any_motor_moving) {  //deactivate drivers
     bldc_idletime++;
     if(bldc_idletime>=100) {
       bldc_idletime = 100;
@@ -1458,7 +1443,6 @@ void dc_process() {
 
 
   if (bldc_cm->ctrl == BLDC_CTRL_STOP) {
-    bldc_pwm = 0;
     ActivateDrivers(0);
   }
 
@@ -1669,62 +1653,32 @@ void dc_Comutate(unsigned char motor, unsigned char state) {
 }
 
 
+uint32_t speed_filter0;
+uint8_t speed_f_cnt0 = 0;
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
+	uint16_t speed_t = __HAL_TIM_GET_COUNTER(&htim16);
 	if(GPIO_Pin == HALL_A1_Pin || GPIO_Pin == HALL_A2_Pin || GPIO_Pin == HALL_A3_Pin ){
-		  if (!(bldc_motors[0].state & BLDC_MOTOR_STATE_DC_OPERATION))
-		    bldc_Comutate(0);
-		  else
-		    dc_Comutate(0, bldc_ReadHall(0));
+		bldc_Comutate(0);
+		speed_filter0 += speed_t - bldc_motors[0].cnt_old;
+		if (speed_t  < bldc_motors[0].cnt_old ){ //Timer overflow
+			speed_filter0 += htim16.Init.Period;
+		}
+		if(++speed_f_cnt0 > 5){
+			bldc_motors[0].speed = speed_filter0 / 6;
+			speed_f_cnt0 = 0;
+			speed_filter0 = 0;
+		}
+		bldc_motors[0].cnt_old = speed_t;
 	}
 	else if(GPIO_Pin == HALL_B1_Pin || GPIO_Pin == HALL_B2_Pin || GPIO_Pin == HALL_B3_Pin ){
-		  if (!(bldc_motors[1].state & BLDC_MOTOR_STATE_DC_OPERATION))
-		    bldc_Comutate(1);
-		  else
-		    dc_Comutate(1, bldc_ReadHall(1));
+		bldc_Comutate(1);
+		if (speed_t  < bldc_motors[1].cnt_old ){ //Timer overflow
+			bldc_motors[1].speed = speed_t + htim16.Init.Period - bldc_motors[1].cnt_old;
+		}else{
+			bldc_motors[1].speed = speed_t - bldc_motors[1].cnt_old;
+		}
+		bldc_motors[1].cnt_old = speed_t;
 	}
 }
-/*
-// HALL Interrupts
-void PIN_INT2_IRQHandler() {
-  if (!(bldc_motors[0].state & BLDC_MOTOR_STATE_DC_OPERATION))
-    bldc_Comutate(0);
-  else
-    dc_Comutate(0, bldc_ReadHall(0));
-  LPC_PINT->IST = 1<<2; //clear edge interrupt
-}  
 
-void PIN_INT3_IRQHandler() {
-  if (!(bldc_motors[0].state & BLDC_MOTOR_STATE_DC_OPERATION))
-    bldc_Comutate(0);
-  else
-    dc_Comutate(0, bldc_ReadHall(0));
-  LPC_PINT->IST = 1<<3; //clear edge interrupt
-}  
-
-void PIN_INT4_IRQHandler() {
-  bldc_Comutate(0);
-  LPC_PINT->IST = 1<<4; //clear edge interrupt
-}  
-
-void PIN_INT5_IRQHandler() {
-  if (!(bldc_motors[1].state & BLDC_MOTOR_STATE_DC_OPERATION))
-    bldc_Comutate(1);
-  else
-    dc_Comutate(1, bldc_ReadHall(1));
-  LPC_PINT->IST = (1<<5) | (1<<6) | (1<<7); //clear edge interrupt
-}  
-
-void PIN_INT6_IRQHandler() {
-  if (!(bldc_motors[1].state & BLDC_MOTOR_STATE_DC_OPERATION))
-    bldc_Comutate(1);
-  else
-    dc_Comutate(1, bldc_ReadHall(1));
-  LPC_PINT->IST = (1<<5) | (1<<6) | (1<<7); //clear edge interrupt
-}  
-
-void PIN_INT7_IRQHandler() {
-  bldc_Comutate(1);
-  LPC_PINT->IST = (1<<5) | (1<<6) | (1<<7); //clear edge interrupt
-}
-*/

@@ -105,7 +105,6 @@ void bindMode_check();
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
-#define TIM1_PRESCALER 5
 #define CHARGE_PUMP_PERIOD 0
 #define CHARGE_PUMP_PULSE 0
 #define MOTOR_PWM_PERIOD 0
