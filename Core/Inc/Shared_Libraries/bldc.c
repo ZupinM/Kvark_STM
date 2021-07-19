@@ -780,8 +780,15 @@ void Flag_check() {
 uint32_t end_time;
 uint32_t s_time = 0;
 
+uint8_t cnt_print;
+
 void bldc_update_pwm(unsigned short value) {
   /* Set the pulse value for channel 1, 2, 3 */
+    //if(cnt_print++ > 9){
+    		uint32_t tmp1 = bldc_cm->state & BLDC_MOTOR_STATE_BRAKING;
+  		  SEGGER_RTT_printf(0, "c%d e%d o%d\r\n", tmp1, (bldc_cm->target-bldc_cm->position), value);
+  		  cnt_print = 0;
+   // }
   __HAL_TIM_SetCompare (&htim1, TIM_CHANNEL_1, value);
   __HAL_TIM_SetCompare (&htim1, TIM_CHANNEL_2, value);
   __HAL_TIM_SetCompare (&htim1, TIM_CHANNEL_3, value);
@@ -932,14 +939,16 @@ void bldc_SetDrivers(unsigned char NewState, unsigned char motor){
       }
     }
 
+    if(!(bldc_cm->state & BLDC_MOTOR_STATE_BRAKING)){
     //activate low side driver
-    switch(NewState & 0x0f){
-      case BLDC_PA_NEG:
-    	  HAL_GPIO_WritePin(MOTOR_A_1L_GPIO_Port, MOTOR_A_1L_Pin, GPIO_PIN_SET); phase_active++; break;// A L L1
-      case BLDC_PB_NEG:
-    	  HAL_GPIO_WritePin(MOTOR_A_2L_GPIO_Port, MOTOR_A_2L_Pin, GPIO_PIN_SET); phase_active++; break;// A L L2
-      case BLDC_PC_NEG:
-    	  HAL_GPIO_WritePin(MOTOR_A_3L_GPIO_Port, MOTOR_A_3L_Pin, GPIO_PIN_SET); phase_active++; break;// A L L3
+		switch(NewState & 0x0f){
+		  case BLDC_PA_NEG:
+			  HAL_GPIO_WritePin(MOTOR_A_1L_GPIO_Port, MOTOR_A_1L_Pin, GPIO_PIN_SET); phase_active++; break;// A L L1
+		  case BLDC_PB_NEG:
+			  HAL_GPIO_WritePin(MOTOR_A_2L_GPIO_Port, MOTOR_A_2L_Pin, GPIO_PIN_SET); phase_active++; break;// A L L2
+		  case BLDC_PC_NEG:
+			  HAL_GPIO_WritePin(MOTOR_A_3L_GPIO_Port, MOTOR_A_3L_Pin, GPIO_PIN_SET); phase_active++; break;// A L L3
+		}
     }
   }
 
@@ -952,6 +961,7 @@ void ActivateDrivers(int dir) {
     bldc_runtime++;
     if(dir != 0)
       return;
+    bldc_update_pwm(0);
     bldc_SetDrivers(0,bldc_cm->index);  //stop
     Enable_ChargePump(0);
     bldc_cm->status &= ~(BLDC_STATUS_ACTIVE | BLDC_STATUS_MANUAL | BLDC_STATUS_WIND_MODE);
@@ -976,11 +986,6 @@ unsigned int motor_err(uint8_t motor)
 {
     return 1; //bldc_motors[motor].target - bldc_motors[motor].position;
 }
-
-
-#define MAX_PWM 0xFFF
-#define START_PWM 315
-#define PWM_STEP 4
 
 int marginPulses;
 int startPulses;
@@ -1262,7 +1267,7 @@ void bldc_process() {
     //bldc_update_pwm(bldc_pwm);
   }else if((err_p < 0) && !(any_motor_moving && !(bldc_cm->status&BLDC_STATUS_CCW))) {
     bldc_cm->status |= BLDC_STATUS_CCW;
-    ActivateDrivers(-1);
+    ActivateDrivers(1);
     //bldc_update_pwm(-bldc_pwm);
   } else {  //deactivate drivers
     bldc_idletime++;
@@ -1541,18 +1546,20 @@ void bldc_Comutate(unsigned char motor){
 
     if(bldc_motors[motor].status & BLDC_STATUS_ACTIVE && (!(bldc_motors[OTHER_MOTOR(motor)].status & BLDC_STATUS_MOVING)  ||  BLDC_MOTOR_COUNT == 1)){   
         moving_counter[motor] = 100;
-        if((bldc_motors[motor].state & BLDC_MOTOR_STATE_INVERT_DIRECTION) != (bldc_motors[motor].state & BLDC_MOTOR_STATE_BRAKING) ){//Inverted operation (XOR braking)
-
-            if(bldc_motors[motor].status & BLDC_STATUS_CCW )
+        if(!(bldc_motors[motor].state & BLDC_MOTOR_STATE_INVERT_DIRECTION) != !(bldc_motors[motor].state & BLDC_MOTOR_STATE_BRAKING) ){//Inverted operation (XOR braking)
+        	SEGGER_RTT_printf(0, "brake");
+            if(bldc_motors[motor].status & BLDC_STATUS_CCW ){
               bldc_SetDrivers(bldc_cw_next [state][1], motor);
-            else                                 
+            }else{
               bldc_SetDrivers(bldc_ccw_next[state][1], motor); 
+            }
         }else{                                       //NORMAL operation         
-            
-            if(bldc_motors[motor].status & BLDC_STATUS_CCW)
+        	SEGGER_RTT_printf(0, "a");
+            if(bldc_motors[motor].status & BLDC_STATUS_CCW){
               bldc_SetDrivers(bldc_ccw_next[state][1], motor);
-            else                                 
+            }else {
               bldc_SetDrivers(bldc_cw_next [state][1], motor); 
+            }
         }
     }else bldc_Speed = 0;
 

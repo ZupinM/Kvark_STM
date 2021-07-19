@@ -26,7 +26,7 @@ int HallCnt1A, HallCnt1B, HallCnt2A, HallCnt2B;
 #define HALL_DEBOUNCE 6
 #define DOWN_POS_MIN 64 // 200ms
 #define DOWN_POS_DEFAULT 160 // 500ms
-#define MOTOR_START_RAMP 1
+#define MOTOR_START_RAMP 4
 
 extern volatile int slaveCommandTimeout;
 
@@ -62,13 +62,14 @@ uint32_t stopTime;
 
 uint8_t Pgain = 40;
 //float Pgain_neg = 0.5;  //Negative PWM PID
-#define P_GAIN_NEG (1/2)  //Negative PWM PID 
+#define P_GAIN_NEG 1/2  //Negative PWM PID
 //float Igain = 0; 
 //float Dgain = 60;
 int32_t speed_err_prev = 0;
 int32_t pid_out_prev;
 
-#define PWM_MAX_NEG 800
+#define PWM_MAX_NEG 8000
+#define ACTIVE_PWM_BRAKING_ERR 20
 //#define USE_D_IN_PID 1
 //#define USE_I_IN_PID 1
 
@@ -156,7 +157,10 @@ static inline void motor_accelerate(int pid_out){
 	  }
 	}
 	bldc_update_pwm(pid_out);
-	ActivateDrivers(1);
+	if(bldc_cm->speed == ZEROSPEED){
+		bldc_cm->status &= ~BLDC_STATUS_ACTIVE; // Required to start ActivateDrivers(1)
+		ActivateDrivers(1);
+	}
 }
 
 static inline void motor_brake(int pid_out){
@@ -205,10 +209,17 @@ static inline void motor_brake(int pid_out){
 			}
 		  }
 	}
+	if(pid_out == 0){
+		pid_out = 1;
+	}
 	bldc_update_pwm(pid_out);
-	ActivateDrivers(1);
+	if(bldc_cm->speed == ZEROSPEED){
+		bldc_cm->status &= ~BLDC_STATUS_ACTIVE; // Required to start ActivateDrivers(1)
+		ActivateDrivers(1);
+	}
 }
-
+uint8_t active_status_old;
+uint8_t cnt_print;
 void position_handling(void) {
 
 
@@ -217,8 +228,9 @@ void position_handling(void) {
   }
 
   if (bldc_cm->speed == bldc_cm->speed_old){
-	  if(bldc_cm->inactivity_cnt++ > 50){
+	  if(bldc_cm->inactivity_cnt++ > 500 && bldc_cm->speed != ZEROSPEED){
 		  bldc_cm->speed = ZEROSPEED;
+		  bldc_cm->inactivity_cnt = 0;
 	  }
   }else{
 	  bldc_cm->speed_old = bldc_cm->speed;
@@ -244,6 +256,13 @@ void position_handling(void) {
     bldc_cm->target = bldc_cm->position;
     return;
   }
+
+  uint8_t active_status = bldc_cm->status & BLDC_STATUS_ACTIVE;
+
+
+  if(active_status != active_status_old)
+	  SEGGER_RTT_printf(0, "switch");
+  active_status_old = active_status;
 
   if (bldc_cm->status & BLDC_STATUS_ACTIVE) {
     int32_t err_position;
@@ -278,7 +297,7 @@ void position_handling(void) {
 
     speed_real = (ZEROSPEED * 100)/bldc_cm->speed; // period converted to speed
 
-    if(((err_position * bldc_cm->speed / 10 )< (stopTime_real) ) && !stop_started && (!ButtonStatus) && //speed  je perioda (1/v), za manj racunanja
+    if(((err_position * bldc_cm->speed / 100 )< (stopTime_real) ) && !stop_started && (!ButtonStatus) && //speed  je perioda (1/v), za manj racunanja
     		(!(bldc_cm->ctrl & BLDC_CTRL_HOMING ))  ) // Dont stop when homing
     { 
       stop_started = 1;
@@ -286,7 +305,6 @@ void position_handling(void) {
       err_position_start = err_position;
       pid_out = 0;
     }
-
     if(stop_started){ //MOTOR STOPING
 
       if(stopTime == 0 && was_full_speed_move){    //Measure stop time on 1st stop
@@ -307,16 +325,16 @@ void position_handling(void) {
       stopTime_cnt = 0;
 
       //HARD ACTIVE BRAKING
-      if(err_position < 1 || brakeStarted ||   (err_position <= 2 && (bldc_cm->speed < bldc_cm->speed_freewheel*6 || OneHallUsed)) ){
+      if(err_position < 3 || brakeStarted ||   (err_position <= 6 && (bldc_cm->speed < bldc_cm->speed_freewheel*6 || OneHallUsed)) ){
         motor_brake(PWM_MAX_NEG); //Hard braking
         brakeStarted = 1;
         //destination_A = position_A;
-        stop_timeout = 320; //40ms hard braking
+        stop_timeout = 400; //40ms hard braking
         return;
       }
 
       if(bldc_cm->speed == ZEROSPEED){ // if motor stopped before destination is reached
-        stop_timeout = 320;
+        stop_timeout = 400;
         motor_accelerate(0); //turn-off PWM
         return;
       }
@@ -353,6 +371,7 @@ void position_handling(void) {
         speed_err_new = speed_err;
       }
 #endif
+
       if(pid_out > 0){ //ACCELERATE
           if(pid_out > MOTOR_PWM_PERIOD){ //Limits
             pid_out = MOTOR_PWM_PERIOD;
@@ -365,7 +384,6 @@ void position_handling(void) {
           motor_brake(-1*pid_out);
       }
     }
-
     else{   //Motor start
       pid_out += MOTOR_START_RAMP;
       if(pid_out > MOTOR_PWM_PERIOD){    //Max Limit

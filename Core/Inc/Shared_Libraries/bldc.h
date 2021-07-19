@@ -25,7 +25,7 @@ typedef struct{
   uint16_t speed;
   uint16_t speed_old;
   uint16_t cnt_old;
-  uint8_t inactivity_cnt;
+  uint16_t inactivity_cnt;
   //configuration
   float         gear_ratio;
   float         I_limit;
