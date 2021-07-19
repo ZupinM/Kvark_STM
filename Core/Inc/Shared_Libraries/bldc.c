@@ -128,7 +128,6 @@ unsigned char hall_fault = 0;
 unsigned char hall_detect = 0;
 unsigned char disconnected_motor[2] = {0, 0};
 unsigned char commutation_counter = 0;
-extern int bounce_stop;
 
 
 float MOTOR_START_VOLTAGE;
@@ -430,14 +429,6 @@ int bldc_setPosition(unsigned char motor, float newpos, int windmode) { //go to 
     bldc_cm->status |=  BLDC_STATUS_WIND_MODE;
   else
     bldc_cm->status &= ~BLDC_STATUS_WIND_MODE;
-
-
- /*  //switch motors immediately after send (current motor is not moving)
-#if BLDC_MOTOR_COUNT > 1
-    if( (target_error(bldc_cm->index) < (bldc_cm->pid.deadband * 5)) && (target_error(OTHER_MOTOR(bldc_cm->index)) > (bldc_cm->pid.deadband * 5)) && (!any_motor_moving)){
-        bldc_cm = &bldc_motors[OTHER_MOTOR(bldc_cm->index)];
-    }
-#endif*/
 
   Flag_check();
   return  0;
@@ -885,14 +876,16 @@ void bldc_SetDrivers(unsigned char NewState, unsigned char motor){
 	      }
 	    }
 
-	    //activate low side driver
-	    switch(NewState & 0x0f){
-	      case BLDC_PA_NEG:
-	    	  HAL_GPIO_WritePin(MOTOR_B_1L_GPIO_Port, MOTOR_B_1L_Pin, GPIO_PIN_SET); phase_active++; break;// A L L1
-	      case BLDC_PB_NEG:
-	    	  HAL_GPIO_WritePin(MOTOR_B_2L_GPIO_Port, MOTOR_B_2L_Pin, GPIO_PIN_SET); phase_active++; break;// A L L2
-	      case BLDC_PC_NEG:
-	    	  HAL_GPIO_WritePin(MOTOR_B_3L_GPIO_Port, MOTOR_B_3L_Pin, GPIO_PIN_SET); phase_active++; break;// A L L3
+	    if(!(bldc_cm->state & BLDC_MOTOR_STATE_BRAKING)){
+			//activate low side driver
+			switch(NewState & 0x0f){
+			  case BLDC_PA_NEG:
+				  HAL_GPIO_WritePin(MOTOR_B_1L_GPIO_Port, MOTOR_B_1L_Pin, GPIO_PIN_SET); phase_active++; break;// A L L1
+			  case BLDC_PB_NEG:
+				  HAL_GPIO_WritePin(MOTOR_B_2L_GPIO_Port, MOTOR_B_2L_Pin, GPIO_PIN_SET); phase_active++; break;// A L L2
+			  case BLDC_PC_NEG:
+				  HAL_GPIO_WritePin(MOTOR_B_3L_GPIO_Port, MOTOR_B_3L_Pin, GPIO_PIN_SET); phase_active++; break;// A L L3
+			}
 	    }
 #endif
    }
@@ -1109,16 +1102,18 @@ void bldc_process() {
 
   
 
-/*
+
 //switch motors when current motor is finished
-    if( (target_error(bldc_cm->index) < (bldc_cm->pid.deadband * 5)) && (target_error(OTHER_MOTOR(bldc_cm->index)) > (bldc_cm->pid.deadband * 5)) && (!any_motor_moving)){
-        bldc_Stop(0);
 #if BLDC_MOTOR_COUNT > 1
-        for(int i=0 ; i<2000000 ; i++);
-        bldc_cm = &bldc_motors[OTHER_MOTOR(bldc_cm->index)];
-        bldc_cm->ctrl = BLDC_CTRL_TRACKING;
+  if( (target_error(bldc_cm->index) < BLDC_DEADBAND) && (!any_motor_moving)){
+  	for(int m=0 ; m<=BLDC_MOTOR_COUNT ; m++){
+  		if(target_error(m) > BLDC_DEADBAND && (bldc_cm->index != m)){
+  			bldc_cm = &bldc_motors[m];
+  			bldc_cm->ctrl = BLDC_CTRL_TRACKING;
+  		}
+  	}
+  }
 #endif
-    }*/
 
   voltage_detection();
   Flag_check();
@@ -1313,16 +1308,16 @@ void dc_process() {
     }	
   }
 
-/*
+
 //switch motors when current motor is finished	
 #if BLDC_MOTOR_COUNT > 1	
-  if( (target_error(bldc_cm->index) < (bldc_cm->pid.deadband * 5)) && (target_error(OTHER_MOTOR(bldc_cm->index)) > (bldc_cm->pid.deadband * 5)) && (!any_motor_moving)){	
+  if( (target_error(bldc_cm->index) < BLDC_DEADBAND) && (target_error(NEXT_MOTOR(bldc_cm->index)) > BLDC_DEADBAND) && (!any_motor_moving)){
     bldc_Stop(0);	
     for(int i=0 ; i<2000000 ; i++);	
-    bldc_cm = &bldc_motors[OTHER_MOTOR(bldc_cm->index)];	
+    bldc_cm = &bldc_motors[NEXT_MOTOR(bldc_cm->index)];
     bldc_cm->ctrl = BLDC_CTRL_TRACKING;	
   }	
-#endif	*/
+#endif
   voltage_detection();	
   Flag_check();	
  // bldc_motor *bldc_cm = &bldc_motors[1];	
@@ -1544,7 +1539,7 @@ void bldc_Comutate(unsigned char motor){
           bldc_motors[motor].position++;
     }
 
-    if(bldc_motors[motor].status & BLDC_STATUS_ACTIVE && (!(bldc_motors[OTHER_MOTOR(motor)].status & BLDC_STATUS_MOVING)  ||  BLDC_MOTOR_COUNT == 1)){   
+    if(bldc_motors[motor].status & BLDC_STATUS_ACTIVE /*&& (!(bldc_motors[OTHER_MOTOR(motor)].status & BLDC_STATUS_MOVING)  ||  BLDC_MOTOR_COUNT == 1)*/){
         moving_counter[motor] = 100;
         if(!(bldc_motors[motor].state & BLDC_MOTOR_STATE_INVERT_DIRECTION) != !(bldc_motors[motor].state & BLDC_MOTOR_STATE_BRAKING) ){//Inverted operation (XOR braking)
         	SEGGER_RTT_printf(0, "brake");
@@ -1635,8 +1630,8 @@ void dc_Comutate(unsigned char motor, unsigned char state) {
   if(bldc_motors[motor].status & BLDC_STATUS_ACTIVE && bldc_motors[motor].status & BLDC_STATUS_MOVING)
     moving_counter[motor] = 100;
 
-  if(bldc_motors[motor].status & BLDC_STATUS_ACTIVE && !(bldc_motors[motor].status & BLDC_STATUS_MOVING) &&
-   (!(bldc_motors[OTHER_MOTOR(motor)].status & BLDC_STATUS_MOVING) || BLDC_MOTOR_COUNT == 1)) {   
+  if(bldc_motors[motor].status & BLDC_STATUS_ACTIVE && !(bldc_motors[motor].status & BLDC_STATUS_MOVING)/* &&
+   (!(bldc_motors[OTHER_MOTOR(motor)].status & BLDC_STATUS_MOVING) || BLDC_MOTOR_COUNT == 1)*/) {
     moving_counter[motor] = 100;
 
     bldc_motors[motor].status |= BLDC_STATUS_MOVING;
@@ -1661,7 +1656,9 @@ void dc_Comutate(unsigned char motor, unsigned char state) {
 
 
 uint32_t speed_filter0;
+uint32_t speed_filter1;
 uint8_t speed_f_cnt0 = 0;
+uint8_t speed_f_cnt1 = 0;
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
 	uint16_t speed_t = __HAL_TIM_GET_COUNTER(&htim16);
@@ -1680,10 +1677,14 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 	}
 	else if(GPIO_Pin == HALL_B1_Pin || GPIO_Pin == HALL_B2_Pin || GPIO_Pin == HALL_B3_Pin ){
 		bldc_Comutate(1);
+		speed_filter1 += speed_t - bldc_motors[1].cnt_old;
 		if (speed_t  < bldc_motors[1].cnt_old ){ //Timer overflow
-			bldc_motors[1].speed = speed_t + htim16.Init.Period - bldc_motors[1].cnt_old;
-		}else{
-			bldc_motors[1].speed = speed_t - bldc_motors[1].cnt_old;
+			speed_filter1 += htim16.Init.Period;
+		}
+		if(++speed_f_cnt1 > 5){
+			bldc_motors[1].speed = speed_filter1 / 6;
+			speed_f_cnt1 = 0;
+			speed_filter1 = 0;
 		}
 		bldc_motors[1].cnt_old = speed_t;
 	}

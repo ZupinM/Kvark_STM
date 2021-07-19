@@ -118,8 +118,11 @@ extern bldc_motor bldc_motors[BLDC_MOTOR_COUNT];
 #define BLDC_CTRL_HOMING_B       (1<<4)
 #define BLDC_CTRL_STOP         (1<<3)
 
-#define OTHER_MOTOR(M)   ((M)^1)
+//#define OTHER_MOTOR(M)   ((M)^1)
+#define NEXT_MOTOR(M)   ((M<BLDC_MOTOR_COUNT) ? (M+1) : 0)
 #define target_error(M) (abs(bldc_motors[M].target - bldc_motors[M].position))
+
+#define BLDC_DEADBAND 5
 
 #define RUNOUT_ACTIVATE 1
 #define RUNOUT_FREEWHEEL 0
