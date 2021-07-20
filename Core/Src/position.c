@@ -260,10 +260,10 @@ void position_handling(void) {
   uint8_t active_status = bldc_cm->status & BLDC_STATUS_ACTIVE;
 
 
-  if(active_status != active_status_old)
-	  SEGGER_RTT_printf(0, "switch");
+/*  if(active_status != active_status_old)
+	  SEGGER_RTT_printf(0, "switchr\r\n");
   active_status_old = active_status;
-
+*/
   if (bldc_cm->status & BLDC_STATUS_ACTIVE) {
     int32_t err_position;
 

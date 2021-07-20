@@ -652,7 +652,7 @@ int main(void)
 			get_LoRa_Status_DIO();
 	       if(lora_int_stat == TRANSMISSION_FINISHED)
 	         tx_finished();
-	       else if(lora_int_stat == PACKET_RECEIVED)
+	       if(lora_int_stat == PACKET_RECEIVED)
 	         rx_finished();
 
 	       if(checkRouting && !rs485_forward_enabled)
@@ -873,9 +873,10 @@ void onlineDevices_check(){
     timeout_counter = 0;
     if(transmission && !LoRa_bindMode_master && !bindMode_byChannel)
        transmission ++;
-    if(transmission > 1000){                 // Transmission hang escape
+    if(transmission > 5){                 // Transmission hang escape
        transmission = 0;
-       //debug_printf("transmission hang");
+       //SEGGER_RTT_printf(0, "transmission hang");
+       LoRa_EntryRx(LoRa_MAX_PACKET, 2000);
     }
   }
   timeout_counter++;

@@ -776,9 +776,9 @@ uint8_t cnt_print;
 void bldc_update_pwm(unsigned short value) {
   /* Set the pulse value for channel 1, 2, 3 */
     //if(cnt_print++ > 9){
-    		uint32_t tmp1 = bldc_cm->state & BLDC_MOTOR_STATE_BRAKING;
-  		  SEGGER_RTT_printf(0, "c%d e%d o%d\r\n", tmp1, (bldc_cm->target-bldc_cm->position), value);
-  		  cnt_print = 0;
+    		//uint32_t tmp1 = bldc_cm->state & BLDC_MOTOR_STATE_BRAKING;
+  		  //SEGGER_RTT_printf(0, "c%d e%d o%d\r\n", tmp1, (bldc_cm->target-bldc_cm->position), value);
+  		  //cnt_print = 0;
    // }
   __HAL_TIM_SetCompare (&htim1, TIM_CHANNEL_1, value);
   __HAL_TIM_SetCompare (&htim1, TIM_CHANNEL_2, value);
@@ -1542,14 +1542,14 @@ void bldc_Comutate(unsigned char motor){
     if(bldc_motors[motor].status & BLDC_STATUS_ACTIVE /*&& (!(bldc_motors[OTHER_MOTOR(motor)].status & BLDC_STATUS_MOVING)  ||  BLDC_MOTOR_COUNT == 1)*/){
         moving_counter[motor] = 100;
         if(!(bldc_motors[motor].state & BLDC_MOTOR_STATE_INVERT_DIRECTION) != !(bldc_motors[motor].state & BLDC_MOTOR_STATE_BRAKING) ){//Inverted operation (XOR braking)
-        	SEGGER_RTT_printf(0, "brake");
+        	//SEGGER_RTT_printf(0, "brake");
             if(bldc_motors[motor].status & BLDC_STATUS_CCW ){
               bldc_SetDrivers(bldc_cw_next [state][1], motor);
             }else{
               bldc_SetDrivers(bldc_ccw_next[state][1], motor); 
             }
         }else{                                       //NORMAL operation         
-        	SEGGER_RTT_printf(0, "a");
+        	//SEGGER_RTT_printf(0, "a");
             if(bldc_motors[motor].status & BLDC_STATUS_CCW){
               bldc_SetDrivers(bldc_ccw_next[state][1], motor);
             }else {

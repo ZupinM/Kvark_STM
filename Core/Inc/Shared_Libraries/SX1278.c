@@ -145,9 +145,9 @@ void rx_finished(void){
   LoRa_SPIRead(LR_RegRxNbBytes, (uint8_t * ) & module.packetLength, 1); //Number of received bytes
  
   // If bad message, skip payload transfer      
-  if(!msg_ok) {     
+  if(!msg_ok) {
+	lora_int_stat = 0;
     return;
-    lora_int_stat = 0;
   }
 
   LoRa_SPIRead(LR_RegFifoRxCurrentaddr, tmp, 1);
@@ -468,6 +468,7 @@ int LoRa_EntryRx(uint8_t length, uint32_t timeout) {
       //LoRa_defaultConfig();
       return 0;
     }
-    for(int i=0 ; i<48000 ; i++);
+    //for(int i=0 ; i<48000 ; i++);
+    //SEGGER_RTT_printf(0, ".|");
   }
 }

@@ -214,7 +214,7 @@ void LoRa_SPIRead(uint8_t addr, uint8_t *pcBuffer, uint8_t cNbBytes) {
 
 void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi){
 	HAL_GPIO_WritePin(LORA_NSS_GPIO_Port, LORA_NSS_Pin, GPIO_PIN_SET);
-	if(transmission == 1){	//Lora fifo loaded -> transmitt over RF
+	if(transmission >= 1){	//Lora fifo loaded -> transmitt over RF
 		SPI_TxFifo_cmplt = 1;
 	}
 }
