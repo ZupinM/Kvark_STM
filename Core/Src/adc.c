@@ -375,7 +375,7 @@ float GetAnalogValues(unsigned char measuring_point) {
 #endif
 #if DEVICE != PICO
     case HALL :
-      return (float)HALLavg  / (bldc_cfg.HConvertRatio * 64);
+      return (float)HALLavg  / (bldc_cfg.HConvertRatio * 64.6);
     case VFOCUS :
     	return (float)VFocavg  /  256;
     case HFOCUS :

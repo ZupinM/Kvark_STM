@@ -223,21 +223,21 @@ void bindMode_check();
 #define XBEE2RS485 7
 #define DEVICE KVARK
 
-#define MOTOR_1H_PORT(index) index ? MOTOR_A_1H_GPIO_Port : MOTOR_B_1H_GPIO_Port
-#define MOTOR_2H_PORT(index) index ? MOTOR_A_2H_GPIO_Port : MOTOR_B_2H_GPIO_Port
-#define MOTOR_3H_PORT(index) index ? MOTOR_A_3H_GPIO_Port : MOTOR_B_3H_GPIO_Port
+#define MOTOR_1H_PORT(index) index ? MOTOR_B_1H_GPIO_Port : MOTOR_A_1H_GPIO_Port
+#define MOTOR_2H_PORT(index) index ? MOTOR_B_2H_GPIO_Port : MOTOR_A_2H_GPIO_Port
+#define MOTOR_3H_PORT(index) index ? MOTOR_B_3H_GPIO_Port : MOTOR_A_3H_GPIO_Port
 
-#define MOTOR_1L_PORT(index) index ? MOTOR_A_1L_GPIO_Port : MOTOR_B_1L_GPIO_Port
-#define MOTOR_2L_PORT(index) index ? MOTOR_A_2L_GPIO_Port : MOTOR_B_2L_GPIO_Port
-#define MOTOR_3L_PORT(index) index ? MOTOR_A_3L_GPIO_Port : MOTOR_B_3L_GPIO_Port
+#define MOTOR_1L_PORT(index) index ? MOTOR_B_1L_GPIO_Port : MOTOR_A_1L_GPIO_Port
+#define MOTOR_2L_PORT(index) index ? MOTOR_B_2L_GPIO_Port : MOTOR_A_2L_GPIO_Port
+#define MOTOR_3L_PORT(index) index ? MOTOR_B_3L_GPIO_Port : MOTOR_A_3L_GPIO_Port
 
-#define MOTOR_1H_PIN(index) index ? MOTOR_A_1H_Pin : MOTOR_B_1H_Pin
-#define MOTOR_2H_PIN(index) index ? MOTOR_A_2H_Pin : MOTOR_B_2H_Pin
-#define MOTOR_3H_PIN(index) index ? MOTOR_A_3H_Pin : MOTOR_B_3H_Pin
+#define MOTOR_1H_PIN(index) index ? MOTOR_B_1H_Pin : MOTOR_A_1H_Pin
+#define MOTOR_2H_PIN(index) index ? MOTOR_B_2H_Pin : MOTOR_A_2H_Pin
+#define MOTOR_3H_PIN(index) index ? MOTOR_B_3H_Pin : MOTOR_A_3H_Pin
 
-#define MOTOR_1L_PIN(index) index ? MOTOR_A_1L_Pin : MOTOR_B_1L_Pin
-#define MOTOR_2L_PIN(index) index ? MOTOR_A_2L_Pin : MOTOR_B_2L_Pin
-#define MOTOR_3L_PIN(index) index ? MOTOR_A_3L_Pin : MOTOR_B_3L_Pin
+#define MOTOR_1L_PIN(index) index ? MOTOR_B_1L_Pin : MOTOR_A_1L_Pin
+#define MOTOR_2L_PIN(index) index ? MOTOR_B_2L_Pin : MOTOR_A_2L_Pin
+#define MOTOR_3L_PIN(index) index ? MOTOR_B_3L_Pin : MOTOR_A_3L_Pin
 
 /* USER CODE END Private defines */
 

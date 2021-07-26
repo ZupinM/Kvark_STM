@@ -112,9 +112,9 @@ static inline void motor_accelerate(int pid_out){
 	}
 	else //DC operation
 	{
-	  //A MOTOR
-	  if (!(bldc_cm->state & BLDC_MOTOR_STATE_DC_B_MOTOR) || (bldc_cm->state & BLDC_MOTOR_STATE_DC_AB_MOTOR) ){
-		if(flags&(1<<pwm_1)){
+	  //Motor 0 & Motor 2
+	  if (bldc_cm->index == 0 || bldc_cm->index == 2){
+		if(!(bldc_cm->status & BLDC_STATUS_CCW)){
 		  //LPC_TMR16B0->MR1 = 0;
 		  setGPIO_Function(MOTOR_2H_PORT(bldc_cm->index), MOTOR_2H_PIN(bldc_cm->index), MODE_OUTPUT);
 		  HAL_GPIO_WritePin(MOTOR_3L_PORT(bldc_cm->index), MOTOR_3L_PIN(bldc_cm->index), GPIO_PIN_RESET);	//disable MOTOR_EN_2
@@ -123,7 +123,7 @@ static inline void motor_accelerate(int pid_out){
 		  setGPIO_Function(MOTOR_1H_PORT(bldc_cm->index), MOTOR_1H_PIN(bldc_cm->index), MODE_ALTERNATE);
 		  HAL_GPIO_WritePin(MOTOR_2L_PORT(bldc_cm->index), MOTOR_2L_PIN(bldc_cm->index), GPIO_PIN_SET);		//enable  MOTOR_EN_12
 		}
-		else if(flags&(1<<pwm_12)){
+		else{
 		  //LPC_TMR16B0->MR0 = 0;
 		  setGPIO_Function(MOTOR_1H_PORT(bldc_cm->index), MOTOR_1H_PIN(bldc_cm->index), MODE_OUTPUT);
 		  HAL_GPIO_WritePin(MOTOR_3L_PORT(bldc_cm->index), MOTOR_3L_PIN(bldc_cm->index), GPIO_PIN_RESET);	//disable MOTOR_EN_2
@@ -133,25 +133,25 @@ static inline void motor_accelerate(int pid_out){
 		  HAL_GPIO_WritePin(MOTOR_1L_PORT(bldc_cm->index), MOTOR_1L_PIN(bldc_cm->index), GPIO_PIN_SET);		//enable  MOTOR_EN_1
 		}
 	  }
-	  //B MOTOR
-	  if (bldc_cm->state & BLDC_MOTOR_STATE_DC_B_MOTOR) {
-		if(flags&(1<<pwm_2)){
+	  //Motor 1 & Motor 3
+	  if (bldc_cm->index == 1 || bldc_cm->index == 3) {
+		  if(!(bldc_cm->status & BLDC_STATUS_CCW)){
 		  //LPC_TMR16B0->MR1 = 0;
-		  setGPIO_Function(MOTOR_2H_PORT(bldc_cm->index), MOTOR_2H_PIN(bldc_cm->index), MODE_OUTPUT);
-		  HAL_GPIO_WritePin(MOTOR_3L_PORT(bldc_cm->index), MOTOR_3L_PIN(bldc_cm->index), GPIO_PIN_RESET);	//disable MOTOR_EN_2
-		  HAL_GPIO_WritePin(MOTOR_1L_PORT(bldc_cm->index), MOTOR_1L_PIN(bldc_cm->index), GPIO_PIN_RESET);	//disable MOTOR_EN_1
+		  setGPIO_Function(MOTOR_2H_PORT(bldc_cm->index -1), MOTOR_2H_PIN(bldc_cm->index -1), MODE_OUTPUT);
+		  HAL_GPIO_WritePin(MOTOR_3L_PORT(bldc_cm->index -1), MOTOR_3L_PIN(bldc_cm->index -1), GPIO_PIN_RESET);	//disable MOTOR_EN_2
+		  HAL_GPIO_WritePin(MOTOR_1L_PORT(bldc_cm->index -1), MOTOR_1L_PIN(bldc_cm->index -1), GPIO_PIN_RESET);	//disable MOTOR_EN_1
 		  //LPC_TMR16B1->MR0 = pid_out;
-		  setGPIO_Function(MOTOR_3H_PORT(bldc_cm->index), MOTOR_3H_PIN(bldc_cm->index), MODE_ALTERNATE);
-		  HAL_GPIO_WritePin(MOTOR_2L_PORT(bldc_cm->index), MOTOR_2L_PIN(bldc_cm->index), GPIO_PIN_SET);		//enable  MOTOR_EN_12
+		  setGPIO_Function(MOTOR_3H_PORT(bldc_cm->index -1), MOTOR_3H_PIN(bldc_cm->index -1), MODE_ALTERNATE);
+		  HAL_GPIO_WritePin(MOTOR_2L_PORT(bldc_cm->index -1), MOTOR_2L_PIN(bldc_cm->index -1), GPIO_PIN_SET);		//enable  MOTOR_EN_12
 		}
-		else if(flags&(1<<pwm_12)){
+		else{
 		  //LPC_TMR16B1->MR0 = 0;
-		  setGPIO_Function(MOTOR_3H_PORT(bldc_cm->index), MOTOR_3H_PIN(bldc_cm->index), MODE_OUTPUT);
-		  HAL_GPIO_WritePin(MOTOR_1L_PORT(bldc_cm->index), MOTOR_1L_PIN(bldc_cm->index), GPIO_PIN_RESET);	//disable MOTOR_EN_1
-		  HAL_GPIO_WritePin(MOTOR_2L_PORT(bldc_cm->index), MOTOR_2L_PIN(bldc_cm->index), GPIO_PIN_RESET);	//disable MOTOR_EN_12
+		  setGPIO_Function(MOTOR_3H_PORT(bldc_cm->index -1), MOTOR_3H_PIN(bldc_cm->index -1), MODE_OUTPUT);
+		  HAL_GPIO_WritePin(MOTOR_1L_PORT(bldc_cm->index -1), MOTOR_1L_PIN(bldc_cm->index -1), GPIO_PIN_RESET);	//disable MOTOR_EN_1
+		  HAL_GPIO_WritePin(MOTOR_2L_PORT(bldc_cm->index -1), MOTOR_2L_PIN(bldc_cm->index -1), GPIO_PIN_RESET);	//disable MOTOR_EN_12
 
-		  setGPIO_Function(MOTOR_2H_PORT(bldc_cm->index), MOTOR_2H_PIN(bldc_cm->index), MODE_ALTERNATE);	//LPC_TMR16B0->MR1 = pid_out;
-		  HAL_GPIO_WritePin(MOTOR_3L_PORT(bldc_cm->index), MOTOR_3L_PIN(bldc_cm->index), GPIO_PIN_SET);		//enable  MOTOR_EN_2
+		  setGPIO_Function(MOTOR_2H_PORT(bldc_cm->index -1), MOTOR_2H_PIN(bldc_cm->index -1), MODE_ALTERNATE);	//LPC_TMR16B0->MR1 = pid_out;
+		  HAL_GPIO_WritePin(MOTOR_3L_PORT(bldc_cm->index -1), MOTOR_3L_PIN(bldc_cm->index -1), GPIO_PIN_SET);		//enable  MOTOR_EN_2
 		  //enable MOTOR_EN_2
 		}
 	  }
@@ -171,8 +171,8 @@ static inline void motor_brake(int pid_out){
 	else //DC operation
 	{
 		  //A MOTOR
-		  if (!(bldc_cm->state & BLDC_MOTOR_STATE_DC_B_MOTOR) || (bldc_cm->state & BLDC_MOTOR_STATE_DC_AB_MOTOR) ){
-			if(flags&(1<<pwm_12)){
+		  if (bldc_cm->index == 0 || bldc_cm->index == 2){
+			if(!(bldc_cm->status & BLDC_STATUS_CCW)){
 			  setGPIO_Function(MOTOR_2H_PORT(bldc_cm->index), MOTOR_2H_PIN(bldc_cm->index), MODE_OUTPUT);		//LPC_TMR16B0->MR1 = 0;
 			  HAL_GPIO_WritePin(MOTOR_3L_PORT(bldc_cm->index), MOTOR_3L_PIN(bldc_cm->index), GPIO_PIN_RESET);	//disable MOTOR_EN_2
 			  HAL_GPIO_WritePin(MOTOR_1L_PORT(bldc_cm->index), MOTOR_1L_PIN(bldc_cm->index), GPIO_PIN_RESET);	//disable MOTOR_EN_1
@@ -180,7 +180,7 @@ static inline void motor_brake(int pid_out){
 			  setGPIO_Function(MOTOR_1H_PORT(bldc_cm->index), MOTOR_1H_PIN(bldc_cm->index), MODE_ALTERNATE);	//LPC_TMR16B0->MR0 = pid_out;
 			  HAL_GPIO_WritePin(MOTOR_2L_PORT(bldc_cm->index), MOTOR_2L_PIN(bldc_cm->index), GPIO_PIN_SET);		//enable  MOTOR_EN_12
 			}
-			else if(flags&(1<<pwm_1)){
+			else{
 			  setGPIO_Function(MOTOR_1H_PORT(bldc_cm->index), MOTOR_1H_PIN(bldc_cm->index), MODE_OUTPUT);		//LPC_TMR16B0->MR0 = 0;
 			  HAL_GPIO_WritePin(MOTOR_3L_PORT(bldc_cm->index), MOTOR_3L_PIN(bldc_cm->index), GPIO_PIN_RESET);	//disable MOTOR_EN_2
 			  HAL_GPIO_WritePin(MOTOR_2L_PORT(bldc_cm->index), MOTOR_2L_PIN(bldc_cm->index), GPIO_PIN_RESET);	//disable MOTOR_EN_12
@@ -190,22 +190,22 @@ static inline void motor_brake(int pid_out){
 			}
 		  }
 		  //B MOTOR
-		  if (bldc_cm->state & BLDC_MOTOR_STATE_DC_B_MOTOR) {
-			if(flags&(1<<pwm_12)){
-			  setGPIO_Function(MOTOR_2H_PORT(bldc_cm->index), MOTOR_2H_PIN(bldc_cm->index), MODE_OUTPUT);		//LPC_TMR16B0->MR1 = 0;
-			  HAL_GPIO_WritePin(MOTOR_3L_PORT(bldc_cm->index), MOTOR_3L_PIN(bldc_cm->index), GPIO_PIN_RESET);	//disable MOTOR_EN_2
-			  HAL_GPIO_WritePin(MOTOR_1L_PORT(bldc_cm->index), MOTOR_1L_PIN(bldc_cm->index), GPIO_PIN_RESET);	//disable MOTOR_EN_1
+		  if (bldc_cm->index == 1 || bldc_cm->index == 3) {
+			if(!(bldc_cm->status & BLDC_STATUS_CCW)){
+			  setGPIO_Function(MOTOR_2H_PORT(bldc_cm->index -1), MOTOR_2H_PIN(bldc_cm->index -1), MODE_OUTPUT);		//LPC_TMR16B0->MR1 = 0;
+			  HAL_GPIO_WritePin(MOTOR_3L_PORT(bldc_cm->index -1), MOTOR_3L_PIN(bldc_cm->index -1), GPIO_PIN_RESET);	//disable MOTOR_EN_2
+			  HAL_GPIO_WritePin(MOTOR_1L_PORT(bldc_cm->index -1), MOTOR_1L_PIN(bldc_cm->index -1), GPIO_PIN_RESET);	//disable MOTOR_EN_1
 
-			  setGPIO_Function(MOTOR_3H_PORT(bldc_cm->index), MOTOR_3H_PIN(bldc_cm->index), MODE_ALTERNATE);	//LPC_TMR16B1->MR0 = pid_out;
-			  HAL_GPIO_WritePin(MOTOR_2L_PORT(bldc_cm->index), MOTOR_2L_PIN(bldc_cm->index), GPIO_PIN_SET);		//enable  MOTOR_EN_12
+			  setGPIO_Function(MOTOR_3H_PORT(bldc_cm->index -1), MOTOR_3H_PIN(bldc_cm->index -1), MODE_ALTERNATE);	//LPC_TMR16B1->MR0 = pid_out;
+			  HAL_GPIO_WritePin(MOTOR_2L_PORT(bldc_cm->index -1), MOTOR_2L_PIN(bldc_cm->index -1), GPIO_PIN_SET);		//enable  MOTOR_EN_12
 			}
-			else if(flags&(1<<pwm_2)){
-			  setGPIO_Function(MOTOR_3H_PORT(bldc_cm->index), MOTOR_3H_PIN(bldc_cm->index), MODE_OUTPUT);		//LPC_TMR16B1->MR0 = 0;
-			  HAL_GPIO_WritePin(MOTOR_1L_PORT(bldc_cm->index), MOTOR_1L_PIN(bldc_cm->index), GPIO_PIN_RESET);	//disable MOTOR_EN_1
-			  HAL_GPIO_WritePin(MOTOR_2L_PORT(bldc_cm->index), MOTOR_2L_PIN(bldc_cm->index), GPIO_PIN_RESET);	//disable MOTOR_EN_12
+			else{
+			  setGPIO_Function(MOTOR_3H_PORT(bldc_cm->index -1), MOTOR_3H_PIN(bldc_cm->index -1), MODE_OUTPUT);		//LPC_TMR16B1->MR0 = 0;
+			  HAL_GPIO_WritePin(MOTOR_1L_PORT(bldc_cm->index -1), MOTOR_1L_PIN(bldc_cm->index -1), GPIO_PIN_RESET);	//disable MOTOR_EN_1
+			  HAL_GPIO_WritePin(MOTOR_2L_PORT(bldc_cm->index -1), MOTOR_2L_PIN(bldc_cm->index -1), GPIO_PIN_RESET);	//disable MOTOR_EN_12
 
-			  setGPIO_Function(MOTOR_2H_PORT(bldc_cm->index), MOTOR_2H_PIN(bldc_cm->index), MODE_ALTERNATE);	//LPC_TMR16B0->MR1 = pid_out;
-			  HAL_GPIO_WritePin(MOTOR_3L_PORT(bldc_cm->index), MOTOR_3L_PIN(bldc_cm->index), GPIO_PIN_SET);		//enable  MOTOR_EN_2
+			  setGPIO_Function(MOTOR_2H_PORT(bldc_cm->index -1), MOTOR_2H_PIN(bldc_cm->index -1), MODE_ALTERNATE);	//LPC_TMR16B0->MR1 = pid_out;
+			  HAL_GPIO_WritePin(MOTOR_3L_PORT(bldc_cm->index -1), MOTOR_3L_PIN(bldc_cm->index -1), GPIO_PIN_SET);		//enable  MOTOR_EN_2
 			}
 		  }
 	}
@@ -257,10 +257,8 @@ void position_handling(void) {
     return;
   }
 
-  uint8_t active_status = bldc_cm->status & BLDC_STATUS_ACTIVE;
-
-
-/*  if(active_status != active_status_old)
+  /*  uint8_t active_status = bldc_cm->status & BLDC_STATUS_ACTIVE;
+  if(active_status != active_status_old)
 	  SEGGER_RTT_printf(0, "switchr\r\n");
   active_status_old = active_status;
 */
@@ -269,7 +267,6 @@ void position_handling(void) {
 
 	err_position = bldc_cm->target - bldc_cm->position;
 	stopTime = bldc_cm->ramp * 10;
-
 
     if(move_direction == MOVE_DIR_OUT && err_position < -100 && //Stop when direction of destination is changed
        (!(bldc_cm->ctrl & BLDC_CTRL_HOMING ))  ) //not when homing
@@ -296,8 +293,7 @@ void position_handling(void) {
     }
 
     speed_real = (ZEROSPEED * 100)/bldc_cm->speed; // period converted to speed
-
-    if(((err_position * bldc_cm->speed / 100 )< (stopTime_real) ) && !stop_started && (!ButtonStatus) && //speed  je perioda (1/v), za manj racunanja
+    if(((err_position * bldc_cm->speed / 25 )< (stopTime_real) ) && !stop_started && (!ButtonStatus) && //speed  je perioda (1/v), za manj racunanja
     		(!(bldc_cm->ctrl & BLDC_CTRL_HOMING ))  ) // Dont stop when homing
     { 
       stop_started = 1;
@@ -448,8 +444,8 @@ void DC_QuadEncoder(void){
 	      //----- Hall A1 -----
 	      if (getHallState1(bldc_cm->index) == GPIO_PIN_SET) {  				// *** hall 1 = 1 ***
 	        if(hallState_prev_A1 == 0){
-	          if(hallCnt1A_S > (bldc_cm->speed/2) || (++debounce_cntA > HALL_DEBOUNCE)){ //FILTER: ignore too short pulses, or deounce counter
-	        	bldc_cm->speed = hallCnt1A_S;     //South pole magnet counter
+	          if(++debounce_cntA > HALL_DEBOUNCE){ //FILTER: ignore too short pulses, or deounce counter
+	        	//bldc_cm->speed = hallCnt1A_S;     //South pole magnet counter
 	            HallCnt1A++;
 	            hallCnt1A_S = 0;
 	            A_enc_new |= (1<<0);
@@ -462,8 +458,8 @@ void DC_QuadEncoder(void){
 	        }
 	      } else {                         				// *** hall 1 = 0 ***
 	        if(hallState_prev_A1 == 1){
-	          if(hallCnt1A_N > (bldc_cm->speed/2) || (++debounce_cntA > HALL_DEBOUNCE)){ //ignore too short pulses (debouncing)
-	        	bldc_cm->speed = hallCnt1A_N;     //North pole magnet counter
+	          if(++debounce_cntA > HALL_DEBOUNCE){ //ignore too short pulses (debouncing)
+	        	//bldc_cm->speed = hallCnt1A_N;     //North pole magnet counter
 	            hallCnt1A_N = 0;
 	            A_enc_new &= ~(1<<0);
 	            debounce_cntA = 0;
@@ -487,8 +483,8 @@ void DC_QuadEncoder(void){
 	      //----- Hall A2 -----
 	      if (getHallState2(bldc_cm->index) == GPIO_PIN_SET) { 				// *** hall 1 = 1 ***
 	        if(hallState_prev_A2 == 0){
-	          if(hallCnt2A_S > (bldc_cm->speed/2) || (++debounce_cntA > HALL_DEBOUNCE)){ //ignore too short pulses (debouncing)
-	        	bldc_cm->speed = hallCnt2A_S;     //South pole magnet counter
+	          if(++debounce_cntA > HALL_DEBOUNCE){ //ignore too short pulses (debouncing)
+	        	//bldc_cm->speed = hallCnt2A_S;     //South pole magnet counter
 	            hallCnt2A_S = 0;
 	            HallCnt1B++;
 	            A_enc_new |= (1<<1);
@@ -501,8 +497,8 @@ void DC_QuadEncoder(void){
 	        }
 	      } else {                         				// *** hall 1 = 0 ***
 	        if(hallState_prev_A2 == 1){
-	          if(hallCnt1A_N > (bldc_cm->speed/2) || (++debounce_cntA > HALL_DEBOUNCE)){ //ignore too short pulses (debouncing)
-	        	bldc_cm->speed = hallCnt2A_N;     //North pole magnet counter
+	          if(++debounce_cntA > HALL_DEBOUNCE){ //ignore too short pulses (debouncing)
+	        	//bldc_cm->speed = hallCnt2A_N;     //North pole magnet counter
 	            hallCnt2A_N = 0;
 	            A_enc_new &= ~(1<<1);
 	            debounce_cntA = 0;

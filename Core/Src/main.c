@@ -178,7 +178,7 @@ uint8_t init_main_state = 1;
 extern volatile unsigned int number_of_poles;
 
 unsigned int motor_operation;
-unsigned int hall_enable;
+unsigned int hall_enable = (0x03 | 0x03 << 16);
 
 //fixed loaction in flash for version and checksum
 __attribute__ ((section (".appver")))
@@ -581,16 +581,17 @@ int main(void)
 
 	     focus_process();
 
-	     if(!(bldc_cm->state & BLDC_MOTOR_STATE_DC_OPERATION))
+	     //if(!(bldc_cm->state & BLDC_MOTOR_STATE_DC_OPERATION))
 	       bldc_process();
-	     else
-	       dc_process(); // brush mode motor
+	     //else
+	       //dc_process(); // brush mode motor
 
 	     tracker_status_check();
 
 	     led_handling();
 
 	     ButtonProcess();
+	     HallVoltage();
 
 	     bindByChannel_check();
 	     onlineDevices_check();
@@ -715,7 +716,6 @@ int main(void)
 	     modbus_timeout_handling(&modbus_cnt2);
 
 	     StatusUpdate();
-
 	     // auto clear status flags
 	     AutoClearFlag();
 

@@ -3,7 +3,7 @@
 
 #include <stdlib.h>
 
-#define ZEROSPEED 			12000
+#define ZEROSPEED 			20000
 #define MOVE_DIR_IN 		0x01
 #define MOVE_DIR_OUT 		0x02
 

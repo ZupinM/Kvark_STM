@@ -217,15 +217,15 @@ void HallVoltage(){
 
   if (voltage_select != voltage_select_old){
     if(voltage_select == 5){
-    	HAL_GPIO_WritePin(V_SELECT_A_GPIO_Port, V_SELECT_A_Pin, GPIO_PIN_SET);
-    	HAL_GPIO_WritePin(V_SELECT_B_GPIO_Port, V_SELECT_B_Pin, GPIO_PIN_SET);
-    }
-    else if(voltage_select == 12){
-    	HAL_GPIO_WritePin(V_SELECT_A_GPIO_Port, V_SELECT_A_Pin, GPIO_PIN_SET);
+    	HAL_GPIO_WritePin(V_SELECT_A_GPIO_Port, V_SELECT_A_Pin, GPIO_PIN_RESET);
     	HAL_GPIO_WritePin(V_SELECT_B_GPIO_Port, V_SELECT_B_Pin, GPIO_PIN_RESET);
     }
-    else if (voltage_select == 20){
+    else if(voltage_select == 12){
     	HAL_GPIO_WritePin(V_SELECT_A_GPIO_Port, V_SELECT_A_Pin, GPIO_PIN_RESET);
+    	HAL_GPIO_WritePin(V_SELECT_B_GPIO_Port, V_SELECT_B_Pin, GPIO_PIN_SET);
+    }
+    else if (voltage_select == 20){
+    	HAL_GPIO_WritePin(V_SELECT_A_GPIO_Port, V_SELECT_A_Pin, GPIO_PIN_SET);
     	HAL_GPIO_WritePin(V_SELECT_B_GPIO_Port, V_SELECT_B_Pin, GPIO_PIN_RESET);
     }
 
