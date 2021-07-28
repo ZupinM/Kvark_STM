@@ -735,6 +735,8 @@ bldc_misc * bldc_config() {
   return &bldc_cfg;
 }
 
+int old_motor_mode[BLDC_MOTOR_COUNT];
+
 void Flag_check() {
   int val;
   for(int i = 0; i < BLDC_MOTOR_COUNT; i++) {
@@ -760,6 +762,10 @@ void Flag_check() {
       if(bldc_motors[i].ctrl == BLDC_CTRL_HOMING)
         bldc_motors[i].status|= BLDC_STATUS_HOMING;
     }
+    if((bldc_motors[i].state & BLDC_MOTOR_STATE_DC_OPERATION) != old_motor_mode[i]){
+    	set_external_INT(i, !(bldc_motors[i].state & BLDC_MOTOR_STATE_DC_OPERATION));
+    }
+    old_motor_mode[i] = bldc_motors[i].state & BLDC_MOTOR_STATE_DC_OPERATION;
   }
 
   if(!(bldc_motors[0].status & BLDC_STATUS_MOVING_IN) && !(bldc_motors[0].status & BLDC_STATUS_MOVING_OUT) &&
@@ -1069,7 +1075,7 @@ void bldc_process() {
     }else if(disconnected_motor[i]){
       disconnected_motor[i]--;
       if(disconnected_motor[i] == 0)
-        bldc_motors[i].status &= BLDC_STATUS_HALL_FAULT;
+        bldc_motors[i].status &= ~BLDC_STATUS_HALL_FAULT;
     }
   
   }
@@ -1240,8 +1246,8 @@ void bldc_process() {
     //bldc_update_pwm(-bldc_pwm);
   } else {  //deactivate drivers
     bldc_idletime++;
-    if(bldc_idletime>=100) {
-      bldc_idletime = 100;
+    if(bldc_idletime>=1000) {
+      bldc_idletime = 1000;
       bldc_cm->ctrl = BLDC_CTRL_IDLE;  
       ActivateDrivers(0);
     }
@@ -1556,16 +1562,6 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 			filter_n_samples = 6;
 		}
 	}
-	else
-	{
-		if(GPIO_Pin == HALL_A1_Pin || GPIO_Pin == HALL_A2_Pin){			//DC Motor 0
-			motor = 0;
-		}
-		else if(GPIO_Pin == HALL_A3_Pin || GPIO_Pin == END_SW_A_HI_Pin){//DC Motor 2
-			motor = 2;
-		}
-
-	}
 
 
 	if (!(bldc_motors[1].state & BLDC_MOTOR_STATE_DC_OPERATION))
@@ -1576,22 +1572,6 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 			filter_n_samples = 6;
 		}
 	}
-	else
-	{
-		if(GPIO_Pin == HALL_B1_Pin || GPIO_Pin == HALL_B2_Pin){			//DC Motor 1
-			motor = 1;
-		}
-		else if(GPIO_Pin == HALL_B3_Pin || GPIO_Pin == END_SW_B_HI_Pin){//DC Motor 3
-			motor = 3;
-		}
-
-	}
-
-	uint32_t speed_c = speed_t - bldc_motors[motor].cnt_old;
-	if (speed_t  < bldc_motors[motor].cnt_old ){ //Timer overflow
-		speed_c += htim16.Init.Period;
-	}
-	SEGGER_RTT_printf(0, "s%d\r\n", speed_t);
 
 	speed_filter[motor] += speed_t - bldc_motors[motor].cnt_old;
 	if (speed_t  < bldc_motors[motor].cnt_old ){ //Timer overflow
@@ -1607,5 +1587,42 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 	}
 	bldc_motors[motor].cnt_old = speed_t;
 
+}
+
+void set_external_INT(uint8_t motor, uint8_t state){
+	  GPIO_InitTypeDef GPIO_InitStruct = {0};
+	  if(state == BLDC_SET_INT){
+		  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING_FALLING;
+	  }
+	  else{
+		  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+	  }
+	  GPIO_InitStruct.Pull = GPIO_PULLUP;
+	  if(motor == MOTOR_0){
+		  GPIO_InitStruct.Pin = HALL_A1_Pin;
+		  HAL_GPIO_DeInit(HALL_A1_GPIO_Port, HALL_A1_Pin); 		//Disables EINT genration
+		  HAL_GPIO_Init(HALL_A1_GPIO_Port, &GPIO_InitStruct);
+
+		  GPIO_InitStruct.Pin = HALL_A2_Pin;
+		  HAL_GPIO_DeInit(HALL_A2_GPIO_Port, HALL_A2_Pin);
+		  HAL_GPIO_Init(HALL_A2_GPIO_Port, &GPIO_InitStruct);
+
+		  GPIO_InitStruct.Pin = HALL_A3_Pin;
+		  HAL_GPIO_DeInit(HALL_A3_GPIO_Port, HALL_A3_Pin);
+		  HAL_GPIO_Init(HALL_A3_GPIO_Port, &GPIO_InitStruct);
+	  }
+	  else if(motor == MOTOR_1){
+		  GPIO_InitStruct.Pin = HALL_B1_Pin;
+		  HAL_GPIO_DeInit(HALL_B1_GPIO_Port, HALL_B1_Pin);
+		  HAL_GPIO_Init(HALL_B1_GPIO_Port, &GPIO_InitStruct);
+
+		  GPIO_InitStruct.Pin = HALL_B2_Pin;
+		  HAL_GPIO_DeInit(HALL_B2_GPIO_Port, HALL_B2_Pin);
+		  HAL_GPIO_Init(HALL_B2_GPIO_Port, &GPIO_InitStruct);
+
+		  GPIO_InitStruct.Pin = HALL_B3_Pin;
+		  HAL_GPIO_DeInit(HALL_B3_GPIO_Port, HALL_B3_Pin);
+		  HAL_GPIO_Init(HALL_B3_GPIO_Port, &GPIO_InitStruct);
+	  }
 }
 

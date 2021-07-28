@@ -129,6 +129,14 @@ extern bldc_motor bldc_motors[BLDC_MOTOR_COUNT];
 
 #define BLDC_DEAD_BAND   1
 
+#define MOTOR_0 0
+#define MOTOR_1 1
+#define MOTOR_2 2
+#define MOTOR_3 3
+
+#define BLDC_SET_INT 1
+#define BLDC_RESET_INT 0
+
 
 #define MOTOR_START_VOLTAGE24 		20.0
 #define UNDERVOLTAGE_LEVEL24		20.0
@@ -169,6 +177,7 @@ void bldc_EnableMotor(unsigned char motor, unsigned char state);
 void bldc_SetDrivers(unsigned char NewState, unsigned char motor);
 void dc_Comutate(unsigned char motor, unsigned char state);
 void motor_rampDC();
+void set_external_INT(uint8_t motor, uint8_t state);
 
 void getFocus(void);
 int m_A_idle();

@@ -46,6 +46,7 @@ extern unsigned int speedB;
 extern unsigned int hall_enable; // bitwise A motor: bits 0, 1; B motor: bits 16, 17.
 extern unsigned int error_hall_A;
 extern unsigned int error_hall_B;
+extern unsigned int moving_counter[4];
 unsigned int A_enc_new;
 unsigned int A_enc_old;
 unsigned int A_enc_temp;
@@ -60,16 +61,21 @@ extern unsigned char move_direction;
 unsigned int countMoving = 0;
 uint32_t stopTime;
 
-uint8_t Pgain = 40;
+uint8_t Pgain;
+uint8_t Pgain_neg;
+uint16_t pid_neg_max;
 //float Pgain_neg = 0.5;  //Negative PWM PID
+#define P_GAIN		40
+#define P_GAIN_DC	5
 #define P_GAIN_NEG 1/2  //Negative PWM PID
+#define P_GAIN_NEG_DC 1/16  //Negative PWM PID
 //float Igain = 0; 
 //float Dgain = 60;
 int32_t speed_err_prev = 0;
 int32_t pid_out_prev;
 
 #define PWM_MAX_NEG 8000
-#define ACTIVE_PWM_BRAKING_ERR 20
+#define PWM_MAX_NEG_DC 80
 //#define USE_D_IN_PID 1
 //#define USE_I_IN_PID 1
 
@@ -172,7 +178,7 @@ static inline void motor_brake(int pid_out){
 	{
 		  //A MOTOR
 		  if (bldc_cm->index == 0 || bldc_cm->index == 2){
-			if(!(bldc_cm->status & BLDC_STATUS_CCW)){
+			if(bldc_cm->status & BLDC_STATUS_CCW){
 			  setGPIO_Function(MOTOR_2H_PORT(bldc_cm->index), MOTOR_2H_PIN(bldc_cm->index), MODE_OUTPUT);		//LPC_TMR16B0->MR1 = 0;
 			  HAL_GPIO_WritePin(MOTOR_3L_PORT(bldc_cm->index), MOTOR_3L_PIN(bldc_cm->index), GPIO_PIN_RESET);	//disable MOTOR_EN_2
 			  HAL_GPIO_WritePin(MOTOR_1L_PORT(bldc_cm->index), MOTOR_1L_PIN(bldc_cm->index), GPIO_PIN_RESET);	//disable MOTOR_EN_1
@@ -186,12 +192,12 @@ static inline void motor_brake(int pid_out){
 			  HAL_GPIO_WritePin(MOTOR_2L_PORT(bldc_cm->index), MOTOR_2L_PIN(bldc_cm->index), GPIO_PIN_RESET);	//disable MOTOR_EN_12
 
 			  setGPIO_Function(MOTOR_2H_PORT(bldc_cm->index), MOTOR_2H_PIN(bldc_cm->index), MODE_ALTERNATE);	//LPC_TMR16B0->MR1 = pid_out;
-			  HAL_GPIO_WritePin(MOTOR_1L_PORT(bldc_cm->index), MOTOR_1L_PIN(bldc_cm->index), GPIO_PIN_SET);		//enable  MOTOR_EN_1
+			  HAL_GPIO_WritePin(MOTOR_1L_PORT(bldc_cm->index), MOTOR_1L_PIN(bldc_cm->index), GPIO_PIN_SET); 		//enable  MOTOR_EN_1
 			}
 		  }
 		  //B MOTOR
 		  if (bldc_cm->index == 1 || bldc_cm->index == 3) {
-			if(!(bldc_cm->status & BLDC_STATUS_CCW)){
+			if(bldc_cm->status & BLDC_STATUS_CCW){
 			  setGPIO_Function(MOTOR_2H_PORT(bldc_cm->index -1), MOTOR_2H_PIN(bldc_cm->index -1), MODE_OUTPUT);		//LPC_TMR16B0->MR1 = 0;
 			  HAL_GPIO_WritePin(MOTOR_3L_PORT(bldc_cm->index -1), MOTOR_3L_PIN(bldc_cm->index -1), GPIO_PIN_RESET);	//disable MOTOR_EN_2
 			  HAL_GPIO_WritePin(MOTOR_1L_PORT(bldc_cm->index -1), MOTOR_1L_PIN(bldc_cm->index -1), GPIO_PIN_RESET);	//disable MOTOR_EN_1
@@ -225,16 +231,23 @@ void position_handling(void) {
 
   if(bldc_cm->state & BLDC_MOTOR_STATE_DC_OPERATION){
 	  DC_QuadEncoder();
+	  Pgain = P_GAIN_DC;
+	  Pgain_neg = P_GAIN_NEG_DC;
+	  pid_neg_max = PWM_MAX_NEG_DC;
   }
-
-  if (bldc_cm->speed == bldc_cm->speed_old){
-	  if(bldc_cm->inactivity_cnt++ > 500 && bldc_cm->speed != ZEROSPEED){
-		  bldc_cm->speed = ZEROSPEED;
+  else{
+	  Pgain = P_GAIN;
+	  Pgain_neg = P_GAIN_NEG;
+	  pid_neg_max = PWM_MAX_NEG;
+	  if (bldc_cm->speed == bldc_cm->speed_old){
+		  if(bldc_cm->inactivity_cnt++ > 500 && bldc_cm->speed != ZEROSPEED){
+			  bldc_cm->speed = ZEROSPEED;
+			  bldc_cm->inactivity_cnt = 0;
+		  }
+	  }else{
+		  bldc_cm->speed_old = bldc_cm->speed;
 		  bldc_cm->inactivity_cnt = 0;
 	  }
-  }else{
-	  bldc_cm->speed_old = bldc_cm->speed;
-	  bldc_cm->inactivity_cnt = 0;
   }
 
 
@@ -293,7 +306,11 @@ void position_handling(void) {
     }
 
     speed_real = (ZEROSPEED * 100)/bldc_cm->speed; // period converted to speed
-    if(((err_position * bldc_cm->speed / 25 )< (stopTime_real) ) && !stop_started && (!ButtonStatus) && //speed  je perioda (1/v), za manj racunanja
+    uint8_t speed_divider = 1;
+    if(!(bldc_cm->state & BLDC_MOTOR_STATE_DC_OPERATION)){
+    	speed_divider = 25;
+    }
+    if(((err_position * bldc_cm->speed / speed_divider )< (stopTime_real) ) && !stop_started && (!ButtonStatus) && //speed  je perioda (1/v), za manj racunanja
     		(!(bldc_cm->ctrl & BLDC_CTRL_HOMING ))  ) // Dont stop when homing
     { 
       stop_started = 1;
@@ -322,7 +339,11 @@ void position_handling(void) {
 
       //HARD ACTIVE BRAKING
       if(err_position < 3 || brakeStarted ||   (err_position <= 6 && (bldc_cm->speed < bldc_cm->speed_freewheel*6 || OneHallUsed)) ){
-        motor_brake(PWM_MAX_NEG); //Hard braking
+    	if(bldc_cm->state & BLDC_MOTOR_STATE_DC_OPERATION){
+    		motor_brake(PWM_MAX_NEG_DC); //Hard braking
+    	}else{
+    		motor_brake(PWM_MAX_NEG); //Hard braking
+    	}
         brakeStarted = 1;
         //destination_A = position_A;
         stop_timeout = 400; //40ms hard braking
@@ -340,7 +361,7 @@ void position_handling(void) {
       speed_err = speed_set - speed_real;
 
       if(speed_err < 0){
-        pid_P = P_GAIN_NEG * speed_err;
+    	pid_P = Pgain_neg * speed_err;
       }else{
         pid_P = Pgain * speed_err;
       }
@@ -367,7 +388,7 @@ void position_handling(void) {
         speed_err_new = speed_err;
       }
 #endif
-
+      SEGGER_RTT_printf(0, "%d, %d %d\r\n", pid_out, err_position, bldc_cm->speed);
       if(pid_out > 0){ //ACCELERATE
           if(pid_out > MOTOR_PWM_PERIOD){ //Limits
             pid_out = MOTOR_PWM_PERIOD;
@@ -375,8 +396,9 @@ void position_handling(void) {
           motor_accelerate(pid_out); 
       }
       else{ //BRAKE
-          if(pid_out < -2*PWM_MAX_NEG)  //Limits
-            pid_out = -2*PWM_MAX_NEG;
+          if(pid_out < -2*pid_neg_max){  //Limits
+             pid_out = -2*pid_neg_max;
+          }
           motor_brake(-1*pid_out);
       }
     }
@@ -391,7 +413,7 @@ void position_handling(void) {
       }
       motor_accelerate(pid_out);
     }
-  }else{ //move_direction == 0
+  }else{ // ! bldc_cm->status & BLDC_STATUS_ACTIVE
     pid_out = 0;
     motorStarting = 0;
   }
@@ -445,7 +467,8 @@ void DC_QuadEncoder(void){
 	      if (getHallState1(bldc_cm->index) == GPIO_PIN_SET) {  				// *** hall 1 = 1 ***
 	        if(hallState_prev_A1 == 0){
 	          if(++debounce_cntA > HALL_DEBOUNCE){ //FILTER: ignore too short pulses, or deounce counter
-	        	//bldc_cm->speed = hallCnt1A_S;     //South pole magnet counter
+	        	bldc_cm->speed = hallCnt1A_S;     //South pole magnet counter
+	        	moving_counter[bldc_cm->index] = 400;
 	            HallCnt1A++;
 	            hallCnt1A_S = 0;
 	            A_enc_new |= (1<<0);
@@ -459,7 +482,8 @@ void DC_QuadEncoder(void){
 	      } else {                         				// *** hall 1 = 0 ***
 	        if(hallState_prev_A1 == 1){
 	          if(++debounce_cntA > HALL_DEBOUNCE){ //ignore too short pulses (debouncing)
-	        	//bldc_cm->speed = hallCnt1A_N;     //North pole magnet counter
+	        	bldc_cm->speed = hallCnt1A_N;     //North pole magnet counter
+	        	moving_counter[bldc_cm->index] = 400;
 	            hallCnt1A_N = 0;
 	            A_enc_new &= ~(1<<0);
 	            debounce_cntA = 0;
@@ -471,11 +495,11 @@ void DC_QuadEncoder(void){
 	        }
 	      }
 
-	    if(hallCnt1A_S < ZEROSPEED)
+	    if(hallCnt1A_S < ZEROSPEED / 10)
 	      hallCnt1A_S++;
 	    else
 	      bldc_cm->speed = ZEROSPEED;
-	    if(hallCnt1A_N < ZEROSPEED)
+	    if(hallCnt1A_N < ZEROSPEED / 10)
 	      hallCnt1A_N++;
 	    }
 
@@ -484,7 +508,8 @@ void DC_QuadEncoder(void){
 	      if (getHallState2(bldc_cm->index) == GPIO_PIN_SET) { 				// *** hall 1 = 1 ***
 	        if(hallState_prev_A2 == 0){
 	          if(++debounce_cntA > HALL_DEBOUNCE){ //ignore too short pulses (debouncing)
-	        	//bldc_cm->speed = hallCnt2A_S;     //South pole magnet counter
+	        	bldc_cm->speed = hallCnt2A_S;     //South pole magnet counter
+	        	moving_counter[bldc_cm->index] = 400;
 	            hallCnt2A_S = 0;
 	            HallCnt1B++;
 	            A_enc_new |= (1<<1);
@@ -498,7 +523,8 @@ void DC_QuadEncoder(void){
 	      } else {                         				// *** hall 1 = 0 ***
 	        if(hallState_prev_A2 == 1){
 	          if(++debounce_cntA > HALL_DEBOUNCE){ //ignore too short pulses (debouncing)
-	        	//bldc_cm->speed = hallCnt2A_N;     //North pole magnet counter
+	        	bldc_cm->speed = hallCnt2A_N;     //North pole magnet counter
+	        	moving_counter[bldc_cm->index] = 400;
 	            hallCnt2A_N = 0;
 	            A_enc_new &= ~(1<<1);
 	            debounce_cntA = 0;
@@ -509,11 +535,11 @@ void DC_QuadEncoder(void){
 	          debounce_cntA--;
 	        }
 	      }
-	    if(hallCnt2A_S < ZEROSPEED)
+	    if(hallCnt2A_S < ZEROSPEED / 10)
 	      hallCnt2A_S++;
 	    else
 	      bldc_cm->speed = ZEROSPEED;
-	    if(hallCnt2A_N < ZEROSPEED)
+	    if(hallCnt2A_N < ZEROSPEED / 10)
 	      hallCnt2A_N++;
 	    }
 	  }
