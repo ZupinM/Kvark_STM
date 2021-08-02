@@ -61,21 +61,22 @@ extern unsigned char move_direction;
 unsigned int countMoving = 0;
 uint32_t stopTime;
 
-uint8_t Pgain;
-uint8_t Pgain_neg;
+float Pgain;
+float Pgain_neg;
 uint16_t pid_neg_max;
 //float Pgain_neg = 0.5;  //Negative PWM PID
 #define P_GAIN		40
-#define P_GAIN_DC	5
-#define P_GAIN_NEG 1/2  //Negative PWM PID
-#define P_GAIN_NEG_DC 1/16  //Negative PWM PID
+#define P_GAIN_DC	1
+#define P_GAIN_NEG (1/2)  //Negative PWM PID
+#define P_GAIN_NEG_DC 1  //Negative PWM PID
 //float Igain = 0; 
 //float Dgain = 60;
 int32_t speed_err_prev = 0;
 int32_t pid_out_prev;
 
 #define PWM_MAX_NEG 8000
-#define PWM_MAX_NEG_DC 80
+#define PWM_MAX_NEG_DC 8000
+#define PWM_MAX_NEG_ACTIVE 200
 //#define USE_D_IN_PID 1
 //#define USE_I_IN_PID 1
 
@@ -184,7 +185,9 @@ static inline void motor_brake(int pid_out){
 			  HAL_GPIO_WritePin(MOTOR_1L_PORT(bldc_cm->index), MOTOR_1L_PIN(bldc_cm->index), GPIO_PIN_RESET);	//disable MOTOR_EN_1
 
 			  setGPIO_Function(MOTOR_1H_PORT(bldc_cm->index), MOTOR_1H_PIN(bldc_cm->index), MODE_ALTERNATE);	//LPC_TMR16B0->MR0 = pid_out;
-			  HAL_GPIO_WritePin(MOTOR_2L_PORT(bldc_cm->index), MOTOR_2L_PIN(bldc_cm->index), GPIO_PIN_SET);		//enable  MOTOR_EN_12
+			  if(pid_out > PWM_MAX_NEG_DC){ // back-EMF braking on first half + active braking on second
+				  HAL_GPIO_WritePin(MOTOR_2L_PORT(bldc_cm->index), MOTOR_2L_PIN(bldc_cm->index), GPIO_PIN_SET);		//enable  MOTOR_EN_12
+			  }
 			}
 			else{
 			  setGPIO_Function(MOTOR_1H_PORT(bldc_cm->index), MOTOR_1H_PIN(bldc_cm->index), MODE_OUTPUT);		//LPC_TMR16B0->MR0 = 0;
@@ -192,7 +195,9 @@ static inline void motor_brake(int pid_out){
 			  HAL_GPIO_WritePin(MOTOR_2L_PORT(bldc_cm->index), MOTOR_2L_PIN(bldc_cm->index), GPIO_PIN_RESET);	//disable MOTOR_EN_12
 
 			  setGPIO_Function(MOTOR_2H_PORT(bldc_cm->index), MOTOR_2H_PIN(bldc_cm->index), MODE_ALTERNATE);	//LPC_TMR16B0->MR1 = pid_out;
-			  HAL_GPIO_WritePin(MOTOR_1L_PORT(bldc_cm->index), MOTOR_1L_PIN(bldc_cm->index), GPIO_PIN_SET); 		//enable  MOTOR_EN_1
+			  if(pid_out > PWM_MAX_NEG_DC){
+				  HAL_GPIO_WritePin(MOTOR_1L_PORT(bldc_cm->index), MOTOR_1L_PIN(bldc_cm->index), GPIO_PIN_SET); 		//enable  MOTOR_EN_1
+			  }
 			}
 		  }
 		  //B MOTOR
@@ -215,8 +220,11 @@ static inline void motor_brake(int pid_out){
 			}
 		  }
 	}
-	if(pid_out == 0){
-		pid_out = 1;
+	if(pid_out > PWM_MAX_NEG_DC){ // back-EMF braking on first half + active braking on second
+		pid_out -= PWM_MAX_NEG_DC;
+	}
+	if(pid_out < 10){
+		pid_out = 10;
 	}
 	bldc_update_pwm(pid_out);
 	if(bldc_cm->speed == ZEROSPEED){
@@ -338,11 +346,11 @@ void position_handling(void) {
       stopTime_cnt = 0;
 
       //HARD ACTIVE BRAKING
-      if(err_position < 3 || brakeStarted ||   (err_position <= 6 && (bldc_cm->speed < bldc_cm->speed_freewheel*6 || OneHallUsed)) ){
+      if(err_position < 1 || brakeStarted ||   (err_position <= 2 && (bldc_cm->speed < bldc_cm->speed_freewheel*6 || OneHallUsed)) ){
     	if(bldc_cm->state & BLDC_MOTOR_STATE_DC_OPERATION){
-    		motor_brake(PWM_MAX_NEG_DC); //Hard braking
+    		motor_brake(PWM_MAX_NEG_DC+PWM_MAX_NEG_ACTIVE); //Hard braking
     	}else{
-    		motor_brake(PWM_MAX_NEG); //Hard braking
+    		motor_brake(PWM_MAX_NEG_ACTIVE); //Hard braking
     	}
         brakeStarted = 1;
         //destination_A = position_A;
@@ -357,13 +365,13 @@ void position_handling(void) {
       }
 
       //PID
-      speed_set = speed_onStart *  (err_position + err_position_start/4) / (err_position_start * 5/4); // Ramp aimed 25% longer, to avoid too low comutation speed
+      speed_set = speed_onStart *  (err_position + err_position_start/3) / (err_position_start * 6/4); // Ramp aimed 25% longer, to avoid too low comutation speed
       speed_err = speed_set - speed_real;
 
       if(speed_err < 0){
-    	pid_P = Pgain_neg * speed_err;
+    	pid_P = P_GAIN_NEG_DC * speed_err;
       }else{
-        pid_P = Pgain * speed_err;
+        pid_P = P_GAIN_DC * speed_err;
       }
       pid_out = pid_P;
 #ifdef USE_I_IN_PID
@@ -388,7 +396,7 @@ void position_handling(void) {
         speed_err_new = speed_err;
       }
 #endif
-      SEGGER_RTT_printf(0, "%d, %d %d\r\n", pid_out, err_position, bldc_cm->speed);
+      SEGGER_RTT_printf(0, "e%d, p%d s%d\r\n", err_position, pid_out, bldc_cm->speed);
       if(pid_out > 0){ //ACCELERATE
           if(pid_out > MOTOR_PWM_PERIOD){ //Limits
             pid_out = MOTOR_PWM_PERIOD;
