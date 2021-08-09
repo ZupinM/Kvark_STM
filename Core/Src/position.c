@@ -67,7 +67,7 @@ uint16_t pid_neg_max;
 //float Pgain_neg = 0.5;  //Negative PWM PID
 #define P_GAIN		40
 #define P_GAIN_DC	3//12
-#define P_GAIN_NEG (1/2)  //Negative PWM PID
+#define P_GAIN_NEG 2  	 //Negative PWM PID divider BLDC
 #define P_GAIN_NEG_DC 4  //Negative PWM PID divider
 //float Igain = 0; 
 //float Dgain = 60;
@@ -361,7 +361,7 @@ void position_handling(void) {
     	if(bldc_cm->state & BLDC_MOTOR_STATE_DC_OPERATION){
     		motor_brake(PWM_MAX_NEG_DC+PWM_MAX_NEG_ACTIVE); //Hard braking
     	}else{
-    		motor_brake(PWM_MAX_NEG_ACTIVE); //Hard braking
+    		motor_brake(PWM_MAX_NEG); //BLDC Hard braking
     	}
         brakeStarted = 1;
         //destination_A = position_A;
@@ -380,9 +380,9 @@ void position_handling(void) {
       speed_err = speed_set - speed_real;
 
       if(speed_err < 0){
-    	pid_P = speed_err / P_GAIN_NEG_DC;
+    	pid_P = speed_err / Pgain_neg;
       }else{
-        pid_P = P_GAIN_DC * speed_err;
+        pid_P = Pgain * speed_err;
       }
       pid_out = pid_P;
 #ifdef USE_I_IN_PID
