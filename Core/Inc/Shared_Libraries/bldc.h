@@ -212,6 +212,7 @@ void bldc_SetInvertHall(unsigned char motor, unsigned int state);
 void bldc_runout(int state);
 void bldc_update_pwm(unsigned short value);
 void ActivateDrivers(int dir);
+void setGPIO_Function(GPIO_TypeDef  *GPIOx, uint16_t GPIO_Pin, uint8_t mode);
 
 
 #endif

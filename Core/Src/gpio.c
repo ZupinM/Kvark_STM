@@ -58,8 +58,8 @@ void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(GPIOA, LORA_NSS_Pin|MOTOR_A_2H_Pin|MOTOR_B_2H_Pin|MOTOR_B_3H_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, MOTOR_B_1L_Pin|MOTOR_A_3L_Pin|V_SELECT_A_Pin|MOTOR_A_2L_Pin
-                          |MOTOR_B_2L_Pin|MOTOR_B_3L_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, MOTOR_B_1L_Pin|MOTOR_A_3L_Pin|V_SELECT_A_Pin|MOTOR_B_2L_Pin
+                          |MOTOR_B_3L_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOE, V_SELECT_B_Pin|MOTOR_A_1L_Pin, GPIO_PIN_RESET);
@@ -88,9 +88,9 @@ void MX_GPIO_Init(void)
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /*Configure GPIO pins : PBPin PBPin PBPin PBPin
-                           PBPin PBPin */
-  GPIO_InitStruct.Pin = MOTOR_B_1L_Pin|MOTOR_A_3L_Pin|V_SELECT_A_Pin|MOTOR_A_2L_Pin
-                          |MOTOR_B_2L_Pin|MOTOR_B_3L_Pin;
+                           PBPin */
+  GPIO_InitStruct.Pin = MOTOR_B_1L_Pin|MOTOR_A_3L_Pin|V_SELECT_A_Pin|MOTOR_B_2L_Pin
+                          |MOTOR_B_3L_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;

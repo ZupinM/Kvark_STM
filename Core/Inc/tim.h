@@ -29,6 +29,8 @@ extern "C" {
 
 /* USER CODE BEGIN Includes */
 
+#include "Shared_Libraries/bldc.h"
+
 /* USER CODE END Includes */
 
 extern TIM_HandleTypeDef htim1;
@@ -42,11 +44,17 @@ extern TIM_HandleTypeDef hChargePumpTIM;
 #undef  CHARGE_PUMP_PERIOD
 #undef  CHARGE_PUMP_PULSE
 #undef  MOTOR_PWM_PERIOD
-#define CHARGE_PUMP_PERIOD  ((uint32_t)(SystemCoreClock / 5000) - 1) /*!< 5kHz  */
-#define CHARGE_PUMP_PULSE  ((uint32_t)((SystemCoreClock / 5000) - 1) / 2 )
-#define MOTOR_PWM_FREQUENCY 10000 //10kHz  //Old Kvark was 4kHz
-#define MOTOR_PWM_PERIOD (SystemCoreClock / MOTOR_PWM_FREQUENCY)
+#undef  TIM1_PRESCALER
+
+#define TIM1_PRESCALER 0
+#define CHARGE_PUMP_PERIOD  ((uint32_t)(SystemCoreClock / 20000) - 1) /*!< 5kHz  */
+#define CHARGE_PUMP_PULSE  ((uint32_t)((SystemCoreClock / 20000) - 1) / 2 )
+#define MOTOR_PWM_FREQUENCY 1000 //10kHz  //Old Kvark was 4kHz
+#define MOTOR_PWM_PERIOD (SystemCoreClock / (TIM1_PRESCALER+1) / MOTOR_PWM_FREQUENCY)
 #define MOTOR_PWM_MIN (MOTOR_PWM_PERIOD / 25)
+
+#define MODE_BLDC 0
+#define MODE_DC 1
 /* USER CODE END Private defines */
 
 void MX_TIM1_Init(void);

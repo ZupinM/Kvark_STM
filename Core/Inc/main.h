@@ -108,6 +108,7 @@ void bindMode_check();
 #define CHARGE_PUMP_PERIOD 0
 #define CHARGE_PUMP_PULSE 0
 #define MOTOR_PWM_PERIOD 0
+#define TIM1_PRESCALER 0
 #define BT3_Pin GPIO_PIN_2
 #define BT3_GPIO_Port GPIOE
 #define CHARGE_PUMP_Pin GPIO_PIN_6

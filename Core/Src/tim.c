@@ -45,7 +45,7 @@ void MX_TIM1_Init(void)
 
   /* USER CODE END TIM1_Init 1 */
   htim1.Instance = TIM1;
-  htim1.Init.Prescaler = 0;
+  htim1.Init.Prescaler = TIM1_PRESCALER;
   htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim1.Init.Period = MOTOR_PWM_PERIOD;
   htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
@@ -65,15 +65,17 @@ void MX_TIM1_Init(void)
   sConfigOC.OCMode = TIM_OCMODE_PWM1;
   sConfigOC.Pulse = 0;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
-  sConfigOC.OCNPolarity = TIM_OCNPOLARITY_HIGH;
+  sConfigOC.OCNPolarity = TIM_OCNPOLARITY_LOW;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
   sConfigOC.OCIdleState = TIM_OCIDLESTATE_RESET;
-  sConfigOC.OCNIdleState = TIM_OCNIDLESTATE_RESET;
+  sConfigOC.OCNIdleState = TIM_OCNIDLESTATE_SET;
   if (HAL_TIM_PWM_ConfigChannel(&htim1, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
   {
     Error_Handler();
   }
   __HAL_TIM_DISABLE_OCxPRELOAD(&htim1, TIM_CHANNEL_1);
+  sConfigOC.OCNPolarity = TIM_OCNPOLARITY_HIGH;
+  sConfigOC.OCNIdleState = TIM_OCNIDLESTATE_RESET;
   if (HAL_TIM_PWM_ConfigChannel(&htim1, &sConfigOC, TIM_CHANNEL_2) != HAL_OK)
   {
     Error_Handler();
@@ -106,13 +108,25 @@ void MX_TIM1_Init(void)
 	  {
 		Error_Handler();
 	  }
+	  if (HAL_TIMEx_PWMN_Start(&htim1, TIM_CHANNEL_1) != HAL_OK)
+	  {
+		Error_Handler();
+	  }
 	   /*Start channel 2 */
 	  if (HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2) != HAL_OK)
 	  {
 		Error_Handler();
 	  }
+	  if (HAL_TIMEx_PWMN_Start(&htim1, TIM_CHANNEL_2) != HAL_OK)
+	  {
+		Error_Handler();
+	  }
 	  /* Start channel 3 */
 	  if (HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_3) != HAL_OK)
+	  {
+		Error_Handler();
+	  }
+	  if (HAL_TIMEx_PWMN_Start(&htim1, TIM_CHANNEL_3) != HAL_OK)
 	  {
 		Error_Handler();
 	  }
@@ -308,10 +322,12 @@ void HAL_TIM_MspPostInit(TIM_HandleTypeDef* timHandle)
 
   /* USER CODE END TIM1_MspPostInit 0 */
     __HAL_RCC_GPIOE_CLK_ENABLE();
+    __HAL_RCC_GPIOB_CLK_ENABLE();
     /**TIM1 GPIO Configuration
     PE9     ------> TIM1_CH1
     PE11     ------> TIM1_CH2
     PE13     ------> TIM1_CH3
+    PB13     ------> TIM1_CH1N
     */
     GPIO_InitStruct.Pin = MOTOR_A_1H_Pin|MOTOR_B_1H_Pin|MOTOR_A_3H_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
@@ -319,6 +335,13 @@ void HAL_TIM_MspPostInit(TIM_HandleTypeDef* timHandle)
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
     GPIO_InitStruct.Alternate = GPIO_AF1_TIM1;
     HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
+
+    GPIO_InitStruct.Pin = MOTOR_A_2L_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    GPIO_InitStruct.Alternate = GPIO_AF1_TIM1;
+    HAL_GPIO_Init(MOTOR_A_2L_GPIO_Port, &GPIO_InitStruct);
 
   /* USER CODE BEGIN TIM1_MspPostInit 1 */
 
@@ -349,6 +372,24 @@ void HAL_TIM_MspPostInit(TIM_HandleTypeDef* timHandle)
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
     GPIO_InitStruct.Alternate = GPIO_AF1_TIM1;
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+
+	GPIO_InitStruct.Pin = MOTOR_A_1L_Pin;
+	HAL_GPIO_Init(MOTOR_A_1L_GPIO_Port, &GPIO_InitStruct);
+
+	GPIO_InitStruct.Pin = MOTOR_A_2L_Pin;
+	HAL_GPIO_Init(MOTOR_A_2L_GPIO_Port, &GPIO_InitStruct);
+
+	GPIO_InitStruct.Pin = MOTOR_A_3L_Pin;
+	HAL_GPIO_Init(MOTOR_A_3L_GPIO_Port, &GPIO_InitStruct);
+
+	setGPIO_Function(MOTOR_A_1H_GPIO_Port, MOTOR_A_1H_Pin, MODE_OUTPUT);
+	setGPIO_Function(MOTOR_A_2H_GPIO_Port, MOTOR_A_2H_Pin, MODE_OUTPUT);
+	setGPIO_Function(MOTOR_A_3H_GPIO_Port, MOTOR_A_3H_Pin, MODE_OUTPUT);
+
+	setGPIO_Function(MOTOR_A_1L_GPIO_Port, MOTOR_A_1L_Pin, MODE_OUTPUT);
+	setGPIO_Function(MOTOR_A_2L_GPIO_Port, MOTOR_A_2L_Pin, MODE_OUTPUT);
+	setGPIO_Function(MOTOR_A_3L_GPIO_Port, MOTOR_A_3L_Pin, MODE_OUTPUT);
 
   /* USER CODE END TIM3_MspPostInit 1 */
   }
@@ -413,6 +454,80 @@ void HAL_TIM_Base_MspDeInit(TIM_HandleTypeDef* tim_baseHandle)
 }
 
 /* USER CODE BEGIN 1 */
+
+void reconfigure_TIM(uint8_t motor, uint8_t mode){
+	GPIO_InitTypeDef GPIO_InitStruct = {0};
+
+	if(mode == MODE_DC){
+		GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+	}else if (mode == MODE_BLDC){
+		GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+		GPIO_InitStruct.Alternate = GPIO_AF1_TIM1;
+	}
+
+
+    if(motor == 0 || motor == 2){
+        GPIO_InitStruct.Pull = GPIO_NOPULL;
+        GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+
+    	GPIO_InitStruct.Pin = MOTOR_A_1H_Pin;
+    	HAL_GPIO_Init(MOTOR_A_1H_GPIO_Port, &GPIO_InitStruct);
+
+    	GPIO_InitStruct.Pin = MOTOR_A_2H_Pin;
+    	HAL_GPIO_Init(MOTOR_A_2H_GPIO_Port, &GPIO_InitStruct);
+
+    	GPIO_InitStruct.Pin = MOTOR_A_3H_Pin;
+    	HAL_GPIO_Init(MOTOR_A_3H_GPIO_Port, &GPIO_InitStruct);
+
+    	if(mode == MODE_DC){
+    		GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    		GPIO_InitStruct.Alternate = GPIO_AF1_TIM1;
+    	}else if (mode == MODE_BLDC){
+    		GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    	}
+
+    	GPIO_InitStruct.Pin = MOTOR_A_1L_Pin;
+    	HAL_GPIO_Init(MOTOR_A_1L_GPIO_Port, &GPIO_InitStruct);
+
+    	GPIO_InitStruct.Pin = MOTOR_A_2L_Pin;
+    	HAL_GPIO_Init(MOTOR_A_2L_GPIO_Port, &GPIO_InitStruct);
+
+    	GPIO_InitStruct.Pin = MOTOR_A_3L_Pin;
+    	HAL_GPIO_Init(MOTOR_A_3L_GPIO_Port, &GPIO_InitStruct);
+    }
+
+    else if((motor == 1 || motor == 3) && mode == MODE_DC){
+        GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+        GPIO_InitStruct.Pull = GPIO_NOPULL;
+        GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+
+    	GPIO_InitStruct.Pin = MOTOR_B_1H_Pin;
+    	HAL_GPIO_Init(MOTOR_B_1H_GPIO_Port, &GPIO_InitStruct);
+
+    	GPIO_InitStruct.Pin = MOTOR_B_2H_Pin;
+    	HAL_GPIO_Init(MOTOR_B_2H_GPIO_Port, &GPIO_InitStruct);
+
+    	GPIO_InitStruct.Pin = MOTOR_B_3H_Pin;
+    	HAL_GPIO_Init(MOTOR_B_3H_GPIO_Port, &GPIO_InitStruct);
+
+    	if(mode == MODE_DC){
+    		GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    		GPIO_InitStruct.Alternate = GPIO_AF1_TIM1;
+    	}else if (mode == MODE_BLDC){
+    		GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    	}
+
+    	GPIO_InitStruct.Pin = MOTOR_B_1L_Pin;
+    	HAL_GPIO_Init(MOTOR_B_1L_GPIO_Port, &GPIO_InitStruct);
+
+    	GPIO_InitStruct.Pin = MOTOR_B_2L_Pin;
+    	HAL_GPIO_Init(MOTOR_B_2L_GPIO_Port, &GPIO_InitStruct);
+
+    	GPIO_InitStruct.Pin = MOTOR_B_3L_Pin;
+    	HAL_GPIO_Init(MOTOR_B_3L_GPIO_Port, &GPIO_InitStruct);
+    }
+
+}
 
 /* USER CODE END 1 */
 

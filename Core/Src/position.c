@@ -66,17 +66,17 @@ float Pgain_neg;
 uint16_t pid_neg_max;
 //float Pgain_neg = 0.5;  //Negative PWM PID
 #define P_GAIN		40
-#define P_GAIN_DC	1
+#define P_GAIN_DC	3//12
 #define P_GAIN_NEG (1/2)  //Negative PWM PID
-#define P_GAIN_NEG_DC 1  //Negative PWM PID
+#define P_GAIN_NEG_DC (1/4)  //Negative PWM PID
 //float Igain = 0; 
 //float Dgain = 60;
 int32_t speed_err_prev = 0;
 int32_t pid_out_prev;
 
-#define PWM_MAX_NEG 8000
-#define PWM_MAX_NEG_DC 8000
-#define PWM_MAX_NEG_ACTIVE 200
+#define PWM_MAX_NEG MOTOR_PWM_PERIOD
+#define PWM_MAX_NEG_DC MOTOR_PWM_PERIOD
+#define PWM_MAX_NEG_ACTIVE 50
 //#define USE_D_IN_PID 1
 //#define USE_I_IN_PID 1
 
@@ -124,19 +124,23 @@ static inline void motor_accelerate(int pid_out){
 		if(!(bldc_cm->status & BLDC_STATUS_CCW)){
 		  //LPC_TMR16B0->MR1 = 0;
 		  setGPIO_Function(MOTOR_2H_PORT(bldc_cm->index), MOTOR_2H_PIN(bldc_cm->index), MODE_OUTPUT);
+		  //setGPIO_Function(MOTOR_1L_PORT(bldc_cm->index), MOTOR_1L_PIN(bldc_cm->index), MODE_OUTPUT);
 		  HAL_GPIO_WritePin(MOTOR_3L_PORT(bldc_cm->index), MOTOR_3L_PIN(bldc_cm->index), GPIO_PIN_RESET);	//disable MOTOR_EN_2
 		  HAL_GPIO_WritePin(MOTOR_1L_PORT(bldc_cm->index), MOTOR_1L_PIN(bldc_cm->index), GPIO_PIN_RESET);	//disable MOTOR_EN_1
 		  //LPC_TMR16B0->MR0 = pid_out;
 		  setGPIO_Function(MOTOR_1H_PORT(bldc_cm->index), MOTOR_1H_PIN(bldc_cm->index), MODE_ALTERNATE);
+		  //setGPIO_Function(MOTOR_2L_PORT(bldc_cm->index), MOTOR_2L_PIN(bldc_cm->index), MODE_ALTERNATE);
 		  HAL_GPIO_WritePin(MOTOR_2L_PORT(bldc_cm->index), MOTOR_2L_PIN(bldc_cm->index), GPIO_PIN_SET);		//enable  MOTOR_EN_12
 		}
 		else{
 		  //LPC_TMR16B0->MR0 = 0;
 		  setGPIO_Function(MOTOR_1H_PORT(bldc_cm->index), MOTOR_1H_PIN(bldc_cm->index), MODE_OUTPUT);
+		  //setGPIO_Function(MOTOR_2L_PORT(bldc_cm->index), MOTOR_2L_PIN(bldc_cm->index), MODE_OUTPUT);
 		  HAL_GPIO_WritePin(MOTOR_3L_PORT(bldc_cm->index), MOTOR_3L_PIN(bldc_cm->index), GPIO_PIN_RESET);	//disable MOTOR_EN_2
 		  HAL_GPIO_WritePin(MOTOR_2L_PORT(bldc_cm->index), MOTOR_2L_PIN(bldc_cm->index), GPIO_PIN_RESET);	//disable MOTOR_EN_12
 		  //LPC_TMR16B0->MR1 = pid_out;
 		  setGPIO_Function(MOTOR_2H_PORT(bldc_cm->index), MOTOR_2H_PIN(bldc_cm->index), MODE_ALTERNATE);
+		  //setGPIO_Function(MOTOR_1L_PORT(bldc_cm->index), MOTOR_1L_PIN(bldc_cm->index), MODE_ALTERNATE);
 		  HAL_GPIO_WritePin(MOTOR_1L_PORT(bldc_cm->index), MOTOR_1L_PIN(bldc_cm->index), GPIO_PIN_SET);		//enable  MOTOR_EN_1
 		}
 	  }
@@ -181,6 +185,7 @@ static inline void motor_brake(int pid_out){
 		  if (bldc_cm->index == 0 || bldc_cm->index == 2){
 			if(bldc_cm->status & BLDC_STATUS_CCW){
 			  setGPIO_Function(MOTOR_2H_PORT(bldc_cm->index), MOTOR_2H_PIN(bldc_cm->index), MODE_OUTPUT);		//LPC_TMR16B0->MR1 = 0;
+			  setGPIO_Function(MOTOR_1L_PORT(bldc_cm->index), MOTOR_1L_PIN(bldc_cm->index), MODE_OUTPUT);		//LPC_TMR16B0->MR1 = 0;
 			  HAL_GPIO_WritePin(MOTOR_3L_PORT(bldc_cm->index), MOTOR_3L_PIN(bldc_cm->index), GPIO_PIN_RESET);	//disable MOTOR_EN_2
 			  HAL_GPIO_WritePin(MOTOR_1L_PORT(bldc_cm->index), MOTOR_1L_PIN(bldc_cm->index), GPIO_PIN_RESET);	//disable MOTOR_EN_1
 
@@ -188,15 +193,21 @@ static inline void motor_brake(int pid_out){
 			  if(pid_out > PWM_MAX_NEG_DC){ // back-EMF braking on first half + active braking on second
 				  HAL_GPIO_WritePin(MOTOR_2L_PORT(bldc_cm->index), MOTOR_2L_PIN(bldc_cm->index), GPIO_PIN_SET);		//enable  MOTOR_EN_12
 			  }
+			  else{
+				  //setGPIO_Function(MOTOR_2L_PORT(bldc_cm->index), MOTOR_2L_PIN(bldc_cm->index), MODE_ALTERNATE);
+			  }
 			}
 			else{
 			  setGPIO_Function(MOTOR_1H_PORT(bldc_cm->index), MOTOR_1H_PIN(bldc_cm->index), MODE_OUTPUT);		//LPC_TMR16B0->MR0 = 0;
+			  setGPIO_Function(MOTOR_2L_PORT(bldc_cm->index), MOTOR_2L_PIN(bldc_cm->index), MODE_OUTPUT);		//LPC_TMR16B0->MR0 = 0;
 			  HAL_GPIO_WritePin(MOTOR_3L_PORT(bldc_cm->index), MOTOR_3L_PIN(bldc_cm->index), GPIO_PIN_RESET);	//disable MOTOR_EN_2
 			  HAL_GPIO_WritePin(MOTOR_2L_PORT(bldc_cm->index), MOTOR_2L_PIN(bldc_cm->index), GPIO_PIN_RESET);	//disable MOTOR_EN_12
 
 			  setGPIO_Function(MOTOR_2H_PORT(bldc_cm->index), MOTOR_2H_PIN(bldc_cm->index), MODE_ALTERNATE);	//LPC_TMR16B0->MR1 = pid_out;
 			  if(pid_out > PWM_MAX_NEG_DC){
 				  HAL_GPIO_WritePin(MOTOR_1L_PORT(bldc_cm->index), MOTOR_1L_PIN(bldc_cm->index), GPIO_PIN_SET); 		//enable  MOTOR_EN_1
+			  }else{
+				  //setGPIO_Function(MOTOR_1L_PORT(bldc_cm->index), MOTOR_1L_PIN(bldc_cm->index), MODE_ALTERNATE);
 			  }
 			}
 		  }
@@ -365,7 +376,7 @@ void position_handling(void) {
       }
 
       //PID
-      speed_set = speed_onStart *  (err_position + err_position_start/3) / (err_position_start * 6/4); // Ramp aimed 25% longer, to avoid too low comutation speed
+      speed_set = speed_onStart *  (err_position + err_position_start/4) / (err_position_start * 5/4); // Ramp aimed 25% longer, to avoid too low comutation speed
       speed_err = speed_set - speed_real;
 
       if(speed_err < 0){
