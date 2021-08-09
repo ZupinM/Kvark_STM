@@ -68,7 +68,7 @@ uint16_t pid_neg_max;
 #define P_GAIN		40
 #define P_GAIN_DC	3//12
 #define P_GAIN_NEG (1/2)  //Negative PWM PID
-#define P_GAIN_NEG_DC (1/4)  //Negative PWM PID
+#define P_GAIN_NEG_DC 4  //Negative PWM PID divider
 //float Igain = 0; 
 //float Dgain = 60;
 int32_t speed_err_prev = 0;
@@ -76,7 +76,7 @@ int32_t pid_out_prev;
 
 #define PWM_MAX_NEG MOTOR_PWM_PERIOD
 #define PWM_MAX_NEG_DC MOTOR_PWM_PERIOD
-#define PWM_MAX_NEG_ACTIVE 50
+#define PWM_MAX_NEG_ACTIVE 80
 //#define USE_D_IN_PID 1
 //#define USE_I_IN_PID 1
 
@@ -380,7 +380,7 @@ void position_handling(void) {
       speed_err = speed_set - speed_real;
 
       if(speed_err < 0){
-    	pid_P = P_GAIN_NEG_DC * speed_err;
+    	pid_P = speed_err / P_GAIN_NEG_DC;
       }else{
         pid_P = P_GAIN_DC * speed_err;
       }
