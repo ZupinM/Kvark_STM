@@ -550,8 +550,10 @@ void modbus_cmd() {
         case MCMD_W_SetHallState: {
           Utemp = mcmd_write_int(0, 0xffffffff);
           hall_enable &= ~0x03;
+          hall_enable &= ~(0x03 << 8);
           hall_enable &= ~(0x03 << 16);
-          hall_enable |= Utemp & (0x03 | 0x03 << 16);
+          hall_enable &= ~(0x03 << 24);
+          hall_enable |= Utemp & (0x03 | 0x03 << 8 | 0x03 << 16 | 0x03 << 24);
           break;
         }
 

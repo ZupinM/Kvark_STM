@@ -161,31 +161,81 @@ void flash_read (unsigned int read_address) {
 
 #if BLDC_MOTOR_COUNT > 1
   // Motor B driving settings
-  bldc_motor *mb = bldc_Motor(1);
+  bldc_motor *m1 = bldc_Motor(1);
 
   err_currentB      = flash_backup[35];
   err_positionB     = flash_backup[36];
   err_voltageB      = flash_backup[37];
 
-  mb->state                    = flash_backup[38];  
-  mb->status                   = flash_backup[39];  
-  mb->position                 = flash_backup[40];  
-  mb->min_position             = flash_backup[41];
-  mb->max_position             = flash_backup[42];
-  mb->Idetection               = flash_backup[43];
-  mb->I_limit                  = flash_backup[44];    
-  mb->I_Inrush_ratio           = flash_backup[45];
-  mb->I_Inrush_time            = flash_backup[46];
-  mb->modbus_timeout_position  = flash_backup[47];
-  mb->gear_ratio               = flash_backup[48];
+  m1->state                    = flash_backup[38];
+  m1->status                   = flash_backup[39];
+  m1->position                 = flash_backup[40];
+  m1->min_position             = flash_backup[41];
+  m1->max_position             = flash_backup[42];
+  m1->Idetection               = flash_backup[43];
+  m1->I_limit                  = flash_backup[44];
+  m1->I_Inrush_ratio           = flash_backup[45];
+  m1->I_Inrush_time            = flash_backup[46];
+  m1->modbus_timeout_position  = flash_backup[47];
+  m1->gear_ratio               = flash_backup[48];
        
-  mb->home_remaining           = flash_backup[49];    
-  mb->home_offset              = flash_backup[50];
-  mb->end_switchDetect         = flash_backup[51];
+  m1->home_remaining           = flash_backup[49];
+  m1->home_offset              = flash_backup[50];
+  m1->end_switchDetect         = flash_backup[51];
   
-  mb->ramp                	   = flash_backup[52];
-  mb->speed_freewheel          = flash_backup[53];
+  m1->ramp                	   = flash_backup[52];
+  m1->speed_freewheel          = flash_backup[53];
 
+#endif
+
+#if BLDC_MOTOR_COUNT > 2
+  bldc_motor *m2 = bldc_Motor(2);
+  //err_currentA      = flash_backup[7]; //TODO
+  //err_positionA     = flash_backup[8];
+  //err_voltageA      = flash_backup[9];
+  m2->state                    = flash_backup[160];
+  m2->status                   = flash_backup[161];
+  m2->position                 = flash_backup[162];
+  m2->min_position             = flash_backup[163];
+  m2->max_position             = flash_backup[164];
+  m2->Idetection               = flash_backup[165];
+  m2->I_limit                  = flash_backup[166];
+  m2->I_Inrush_ratio           = flash_backup[167];
+  m2->I_Inrush_time            = flash_backup[168];
+  m2->modbus_timeout_position  = flash_backup[169];
+  m2->gear_ratio               = flash_backup[170];
+
+  m2->home_remaining           = flash_backup[171];
+  m2->home_offset              = flash_backup[172];
+  m2->end_switchDetect         = flash_backup[173];
+
+  m2->ramp               	  = flash_backup[174];
+  m2->speed_freewheel          = flash_backup[175];
+#endif
+
+#if BLDC_MOTOR_COUNT > 3
+  bldc_motor *m3 = bldc_Motor(3);
+  //err_currentA      = flash_backup[7]; //TODO
+  //err_positionA     = flash_backup[8];
+  //err_voltageA      = flash_backup[9];
+  m3->state                    = flash_backup[176];
+  m3->status                   = flash_backup[177];
+  m3->position                 = flash_backup[178];
+  m3->min_position             = flash_backup[179];
+  m3->max_position             = flash_backup[180];
+  m3->Idetection               = flash_backup[181];
+  m3->I_limit                  = flash_backup[182];
+  m3->I_Inrush_ratio           = flash_backup[183];
+  m3->I_Inrush_time            = flash_backup[184];
+  m3->modbus_timeout_position  = flash_backup[185];
+  m3->gear_ratio               = flash_backup[186];
+
+  m3->home_remaining           = flash_backup[187];
+  m3->home_offset              = flash_backup[188];
+  m3->end_switchDetect         = flash_backup[189];
+
+  m3->ramp               	  = flash_backup[190];
+  m3->speed_freewheel          = flash_backup[191];
 #endif
   //longitude                    = flash_backup[57];
   //latitude                     = flash_backup[67];
@@ -222,7 +272,6 @@ void flash_read (unsigned int read_address) {
   tracker_status    = flash_backup_ui[2];
   tracker_exstatus  = flash_backup_ui[3];
 
-  m->position                 = flash_backup[19];
 #if BLDC_MOTOR_COUNT == 2
   //bldc_motor *mb = bldc_Motor(1);
   //mb->position                 = flash_backup[40];
@@ -500,6 +549,169 @@ int flash_write(unsigned int write_address) {
     upgrExe = 1;
   }
 //#endif
+
+#if BLDC_MOTOR_COUNT > 2
+   mb = bldc_Motor(2);
+
+   /*if(flash_backup[35] != err_currentB) {TODO
+     flash_backup[35] = err_currentB;
+   }
+   if(flash_backup[36] != err_positionB) {
+     flash_backup[36] = err_positionB;
+   }
+   if(flash_backup[37] != err_voltageB) {
+     flash_backup[37] = err_voltageB;
+   }*/
+
+   if(flash_backup[160] != (float)mb->state) {
+     flash_backup[160] = mb->state;
+     upgrExe = 1;
+   }
+   if(flash_backup[161] != (float)mb->status) {
+     flash_backup[161] = mb->status;
+     upgrExe = 1;
+   }
+   if(flash_backup[162] != (float)mb->position) {
+     flash_backup[162] = mb->position;
+     upgrExe = 1;
+   }
+   if(flash_backup[163] != mb->min_position) {
+     flash_backup[163] = mb->min_position;
+     upgrExe = 1;
+   }
+   if(flash_backup[164] != mb->max_position) {
+     flash_backup[164] = mb->max_position;
+     upgrExe = 1;
+   }
+   if(flash_backup[165] != mb->Idetection) {
+     flash_backup[165] = mb->Idetection;
+     upgrExe = 1;
+   }
+   if(flash_backup[166] != mb->I_limit) {
+     flash_backup[166] = mb->I_limit;
+     upgrExe = 1;
+   }
+   if(flash_backup[167] != mb->I_Inrush_ratio) {
+     flash_backup[167] = mb->I_Inrush_ratio;
+     upgrExe = 1;
+   }
+   if(flash_backup[168] != mb->I_Inrush_time) {
+     flash_backup[168] = mb->I_Inrush_time;
+     upgrExe = 1;
+   }
+   if(flash_backup[169] != mb->modbus_timeout_position) {
+     flash_backup[169] = mb->modbus_timeout_position;
+     upgrExe = 1;
+   }
+   if(flash_backup[170] != mb->gear_ratio) {
+     flash_backup[170] = mb->gear_ratio;
+     upgrExe = 1;
+   }
+
+   if(flash_backup[171] != (float)mb->home_remaining) {
+     flash_backup[171] = mb->home_remaining;
+     upgrExe = 1;
+   }
+   if(flash_backup[172] != mb->home_offset) {
+     flash_backup[172] = mb->home_offset;
+     upgrExe = 1;
+   }
+   if(flash_backup[173] != mb->end_switchDetect) {
+     flash_backup[173] = mb->end_switchDetect;
+     upgrExe = 1;
+   }
+
+   if(flash_backup[174] != mb->ramp) {
+     flash_backup[174] = mb->ramp;
+     upgrExe = 1;
+   }
+   if(flash_backup[175] != mb->speed_freewheel) {
+     flash_backup[175] = mb->speed_freewheel;
+     upgrExe = 1;
+   }
+#endif
+
+#if BLDC_MOTOR_COUNT > 3
+   mb = bldc_Motor(3);
+
+   /*if(flash_backup[35] != err_currentB) {TODO
+     flash_backup[35] = err_currentB;
+   }
+   if(flash_backup[36] != err_positionB) {
+     flash_backup[36] = err_positionB;
+   }
+   if(flash_backup[37] != err_voltageB) {
+     flash_backup[37] = err_voltageB;
+   }*/
+
+   if(flash_backup[176] != (float)mb->state) {
+     flash_backup[176] = mb->state;
+     upgrExe = 1;
+   }
+   if(flash_backup[177] != (float)mb->status) {
+     flash_backup[177] = mb->status;
+     upgrExe = 1;
+   }
+   if(flash_backup[178] != (float)mb->position) {
+     flash_backup[178] = mb->position;
+     upgrExe = 1;
+   }
+   if(flash_backup[179] != mb->min_position) {
+     flash_backup[179] = mb->min_position;
+     upgrExe = 1;
+   }
+   if(flash_backup[180] != mb->max_position) {
+     flash_backup[180] = mb->max_position;
+     upgrExe = 1;
+   }
+   if(flash_backup[181] != mb->Idetection) {
+     flash_backup[181] = mb->Idetection;
+     upgrExe = 1;
+   }
+   if(flash_backup[182] != mb->I_limit) {
+     flash_backup[182] = mb->I_limit;
+     upgrExe = 1;
+   }
+   if(flash_backup[183] != mb->I_Inrush_ratio) {
+     flash_backup[183] = mb->I_Inrush_ratio;
+     upgrExe = 1;
+   }
+   if(flash_backup[184] != mb->I_Inrush_time) {
+     flash_backup[184] = mb->I_Inrush_time;
+     upgrExe = 1;
+   }
+   if(flash_backup[185] != mb->modbus_timeout_position) {
+     flash_backup[185] = mb->modbus_timeout_position;
+     upgrExe = 1;
+   }
+   if(flash_backup[186] != mb->gear_ratio) {
+     flash_backup[186] = mb->gear_ratio;
+     upgrExe = 1;
+   }
+
+   if(flash_backup[187] != (float)mb->home_remaining) {
+     flash_backup[187] = mb->home_remaining;
+     upgrExe = 1;
+   }
+   if(flash_backup[188] != mb->home_offset) {
+     flash_backup[188] = mb->home_offset;
+     upgrExe = 1;
+   }
+   if(flash_backup[189] != mb->end_switchDetect) {
+     flash_backup[189] = mb->end_switchDetect;
+     upgrExe = 1;
+   }
+
+   if(flash_backup[190] != mb->ramp) {
+     flash_backup[190] = mb->ramp;
+     upgrExe = 1;
+   }
+   if(flash_backup[191] != mb->speed_freewheel) {
+     flash_backup[191] = mb->speed_freewheel;
+     upgrExe = 1;
+   }
+#endif
+
   if(flash_backup[56] != (float)reset_status) {
     flash_backup[56] = reset_status;
     upgrExe = 1;

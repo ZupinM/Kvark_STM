@@ -12,11 +12,9 @@
 /******************************************************************************
   SysTick_Handler		8kHz (125us)
 *******************************************************************************/
-int HallCnt1A, HallCnt1B, HallCnt2A, HallCnt2B;
 
 #include "position.h"
 #include "main.h"
-#include "gpio.h"
 #include "Shared_Libraries/bldc.h"
 #include "adc.h"
 #include "tim.h"
@@ -31,32 +29,22 @@ int HallCnt1A, HallCnt1B, HallCnt2A, HallCnt2B;
 extern volatile int slaveCommandTimeout;
 
 // variables for terminating ramp
-char first_moving = 1;
 unsigned int stop_timeout = 0;
 char motor_break = 0;
 int measureDelay = 0;
-uint8_t debounce_cntA;
-uint8_t debounce_cntB;
+uint8_t debounce_cntA[BLDC_MOTOR_COUNT];
 
 extern volatile unsigned int SysTics;
 extern volatile unsigned int tick_1ms_cnt;
 extern volatile unsigned int flags;
 extern unsigned int speedA;
 extern unsigned int speedB;
-extern unsigned int hall_enable; // bitwise A motor: bits 0, 1; B motor: bits 16, 17.
 extern unsigned int error_hall_A;
 extern unsigned int error_hall_B;
 extern unsigned int moving_counter[4];
-unsigned int A_enc_new;
-unsigned int A_enc_old;
-unsigned int A_enc_temp;
-unsigned int B_enc_new;
-unsigned int B_enc_old;
-unsigned int B_enc_temp;
-char first_movingA = 1;
-char first_movingB = 1;
-char moving_dirA = 0;
-char moving_dirB = 0;
+unsigned int A_enc_new[BLDC_MOTOR_COUNT];
+unsigned int A_enc_old[BLDC_MOTOR_COUNT];
+unsigned int A_enc_temp[BLDC_MOTOR_COUNT];
 extern unsigned char move_direction;
 unsigned int countMoving = 0;
 uint32_t stopTime;
@@ -93,21 +81,21 @@ uint32_t stopTime_real;
 uint8_t was_full_speed_move;
 uint8_t brakeStarted;
 
-uint16_t hallCnt1A_S;
-uint16_t hallCnt1A_N;
-uint16_t hallCnt2A_S;
-uint16_t hallCnt2A_N;
-uint8_t hallState_prev_A1;
-uint8_t hallState_prev_A2;
-uint8_t hallState_prev_B1;
-uint8_t hallState_prev_B2;
+uint16_t hallCntA_S[BLDC_MOTOR_COUNT];
+uint16_t hallCntA_N[BLDC_MOTOR_COUNT];
+uint16_t hallCntB_S[BLDC_MOTOR_COUNT];
+uint16_t hallCntB_N[BLDC_MOTOR_COUNT];
+uint8_t hallState_prev_A1[BLDC_MOTOR_COUNT];
+uint8_t hallState_prev_A2[BLDC_MOTOR_COUNT];
+
+int HallCntA[BLDC_MOTOR_COUNT];
+int HallCntB[BLDC_MOTOR_COUNT];
 
 uint16_t speed_real; // period converted to speed
 int32_t speed_err;
 uint16_t speed_err_new; //pid_D saved speed
 int32_t err_position_start;
 uint8_t motorStarting;
-uint8_t OneHallUsed;
 
 
 
@@ -124,23 +112,19 @@ static inline void motor_accelerate(int pid_out){
 		if(!(bldc_cm->status & BLDC_STATUS_CCW)){
 		  //LPC_TMR16B0->MR1 = 0;
 		  setGPIO_Function(MOTOR_2H_PORT(bldc_cm->index), MOTOR_2H_PIN(bldc_cm->index), MODE_OUTPUT);
-		  //setGPIO_Function(MOTOR_1L_PORT(bldc_cm->index), MOTOR_1L_PIN(bldc_cm->index), MODE_OUTPUT);
 		  HAL_GPIO_WritePin(MOTOR_3L_PORT(bldc_cm->index), MOTOR_3L_PIN(bldc_cm->index), GPIO_PIN_RESET);	//disable MOTOR_EN_2
 		  HAL_GPIO_WritePin(MOTOR_1L_PORT(bldc_cm->index), MOTOR_1L_PIN(bldc_cm->index), GPIO_PIN_RESET);	//disable MOTOR_EN_1
 		  //LPC_TMR16B0->MR0 = pid_out;
 		  setGPIO_Function(MOTOR_1H_PORT(bldc_cm->index), MOTOR_1H_PIN(bldc_cm->index), MODE_ALTERNATE);
-		  //setGPIO_Function(MOTOR_2L_PORT(bldc_cm->index), MOTOR_2L_PIN(bldc_cm->index), MODE_ALTERNATE);
 		  HAL_GPIO_WritePin(MOTOR_2L_PORT(bldc_cm->index), MOTOR_2L_PIN(bldc_cm->index), GPIO_PIN_SET);		//enable  MOTOR_EN_12
 		}
 		else{
 		  //LPC_TMR16B0->MR0 = 0;
 		  setGPIO_Function(MOTOR_1H_PORT(bldc_cm->index), MOTOR_1H_PIN(bldc_cm->index), MODE_OUTPUT);
-		  //setGPIO_Function(MOTOR_2L_PORT(bldc_cm->index), MOTOR_2L_PIN(bldc_cm->index), MODE_OUTPUT);
 		  HAL_GPIO_WritePin(MOTOR_3L_PORT(bldc_cm->index), MOTOR_3L_PIN(bldc_cm->index), GPIO_PIN_RESET);	//disable MOTOR_EN_2
 		  HAL_GPIO_WritePin(MOTOR_2L_PORT(bldc_cm->index), MOTOR_2L_PIN(bldc_cm->index), GPIO_PIN_RESET);	//disable MOTOR_EN_12
 		  //LPC_TMR16B0->MR1 = pid_out;
 		  setGPIO_Function(MOTOR_2H_PORT(bldc_cm->index), MOTOR_2H_PIN(bldc_cm->index), MODE_ALTERNATE);
-		  //setGPIO_Function(MOTOR_1L_PORT(bldc_cm->index), MOTOR_1L_PIN(bldc_cm->index), MODE_ALTERNATE);
 		  HAL_GPIO_WritePin(MOTOR_1L_PORT(bldc_cm->index), MOTOR_1L_PIN(bldc_cm->index), GPIO_PIN_SET);		//enable  MOTOR_EN_1
 		}
 	  }
@@ -357,7 +341,7 @@ void position_handling(void) {
       stopTime_cnt = 0;
 
       //HARD ACTIVE BRAKING
-      if(err_position < 1 || brakeStarted ||   (err_position <= 2 && (bldc_cm->speed < bldc_cm->speed_freewheel*6 || OneHallUsed)) ){
+      if(err_position < 1 || brakeStarted ||   (err_position <= 2 && (bldc_cm->speed < bldc_cm->speed_freewheel*6 || get_Hall_Enable(bldc_cm->index, HALL_ENABLED_SINGLE))) ){
     	if(bldc_cm->state & BLDC_MOTOR_STATE_DC_OPERATION){
     		motor_brake(PWM_MAX_NEG_DC+PWM_MAX_NEG_ACTIVE); //Hard braking
     	}else{
@@ -479,87 +463,88 @@ GPIO_PinState getHallState2(unsigned char index){
 
 
 void DC_QuadEncoder(void){
+	uint8_t motor = bldc_cm->index;
 	//----------A-MOTOR Fast Hall Read
 	  if (!(bldc_cm->state & BLDC_MOTOR_STATE_DC_B_MOTOR) || (bldc_cm->state & BLDC_MOTOR_STATE_DC_AB_MOTOR) ){
-	    if((hall_enable & 0x03) == 0x03 || (hall_enable & 0x03) == 0x01) { //Read motor speed 4x per turn
+	    if(get_Hall_Enable(motor, HALL_ENABLED_A)) { //Read motor speed 4x per turn
 	      //----- Hall A1 -----
 	      if (getHallState1(bldc_cm->index) == GPIO_PIN_SET) {  				// *** hall 1 = 1 ***
-	        if(hallState_prev_A1 == 0){
-	          if(++debounce_cntA > HALL_DEBOUNCE){ //FILTER: ignore too short pulses, or deounce counter
-	        	bldc_cm->speed = hallCnt1A_S;     //South pole magnet counter
-	        	moving_counter[bldc_cm->index] = 400;
-	            HallCnt1A++;
-	            hallCnt1A_S = 0;
-	            A_enc_new |= (1<<0);
-	            debounce_cntA = 0;
-	            hallState_prev_A1 = 1;
+	        if(hallState_prev_A1[motor] == 0){
+	          if(++debounce_cntA[motor] > HALL_DEBOUNCE){ //FILTER: ignore too short pulses, or deounce counter
+	        	bldc_cm->speed = hallCntA_S[motor];     //South pole magnet counter
+	        	moving_counter[motor] = 400;
+	            HallCntA[motor]++;
+	            hallCntA_S[motor] = 0;
+	            A_enc_new[motor] |= (1<<0);
+	            debounce_cntA[motor] = 0;
+	            hallState_prev_A1[motor] = 1;
 	          }
 	        }
 	        else{ //hallState_prev_A1 == 1
-	          debounce_cntA--;
+	          debounce_cntA[motor]--;
 	        }
 	      } else {                         				// *** hall 1 = 0 ***
-	        if(hallState_prev_A1 == 1){
-	          if(++debounce_cntA > HALL_DEBOUNCE){ //ignore too short pulses (debouncing)
-	        	bldc_cm->speed = hallCnt1A_N;     //North pole magnet counter
-	        	moving_counter[bldc_cm->index] = 400;
-	            hallCnt1A_N = 0;
-	            A_enc_new &= ~(1<<0);
-	            debounce_cntA = 0;
-	            hallState_prev_A1 = 0;
+	        if(hallState_prev_A1[motor] == 1){
+	          if(++debounce_cntA[motor] > HALL_DEBOUNCE){ //ignore too short pulses (debouncing)
+	        	bldc_cm->speed = hallCntA_N[motor];     //North pole magnet counter
+	        	moving_counter[motor] = 400;
+	            hallCntA_N[motor] = 0;
+	            A_enc_new[motor] &= ~(1<<0);
+	            debounce_cntA[motor] = 0;
+	            hallState_prev_A1[motor] = 0;
 	          }
 	        }
 	        else{ //hallState_prev_A1 == 0
-	          debounce_cntA--;
+	          debounce_cntA[motor]--;
 	        }
 	      }
 
-	    if(hallCnt1A_S < ZEROSPEED / 10)
-	      hallCnt1A_S++;
+	    if(hallCntA_S[motor] < ZEROSPEED / 10)
+	      hallCntA_S[motor]++;
 	    else
 	      bldc_cm->speed = ZEROSPEED;
-	    if(hallCnt1A_N < ZEROSPEED / 10)
-	      hallCnt1A_N++;
+	    if(hallCntA_N[motor] < ZEROSPEED / 10)
+	      hallCntA_N[motor]++;
 	    }
 
-	    if((hall_enable & 0x03) == 0x03 || (hall_enable & 0x03) == 0x02) {
+	    if(get_Hall_Enable(motor, HALL_ENABLED_B)) {
 	      //----- Hall A2 -----
-	      if (getHallState2(bldc_cm->index) == GPIO_PIN_SET) { 				// *** hall 1 = 1 ***
-	        if(hallState_prev_A2 == 0){
-	          if(++debounce_cntA > HALL_DEBOUNCE){ //ignore too short pulses (debouncing)
-	        	bldc_cm->speed = hallCnt2A_S;     //South pole magnet counter
-	        	moving_counter[bldc_cm->index] = 400;
-	            hallCnt2A_S = 0;
-	            HallCnt1B++;
-	            A_enc_new |= (1<<1);
-	            debounce_cntA = 0;
-	            hallState_prev_A2 = 1;
+	      if (getHallState2(motor) == GPIO_PIN_SET) { 				// *** hall 1 = 1 ***
+	        if(hallState_prev_A2[motor] == 0){
+	          if(++debounce_cntA[motor] > HALL_DEBOUNCE){ //ignore too short pulses (debouncing)
+	        	bldc_cm->speed = hallCntB_S[motor];     //South pole magnet counter
+	        	moving_counter[motor] = 400;
+	            hallCntB_S[motor] = 0;
+	            HallCntB[motor]++;
+	            A_enc_new[motor] |= (1<<1);
+	            debounce_cntA[motor] = 0;
+	            hallState_prev_A2[motor] = 1;
 	          }
 	        }
 	        else{ //hallState_prev_A2 == 1
-	          debounce_cntA--;
+	          debounce_cntA[motor]--;
 	        }
 	      } else {                         				// *** hall 1 = 0 ***
-	        if(hallState_prev_A2 == 1){
-	          if(++debounce_cntA > HALL_DEBOUNCE){ //ignore too short pulses (debouncing)
-	        	bldc_cm->speed = hallCnt2A_N;     //North pole magnet counter
-	        	moving_counter[bldc_cm->index] = 400;
-	            hallCnt2A_N = 0;
-	            A_enc_new &= ~(1<<1);
-	            debounce_cntA = 0;
-	            hallState_prev_A2 = 0;
+	        if(hallState_prev_A2[motor] == 1){
+	          if(++debounce_cntA[motor] > HALL_DEBOUNCE){ //ignore too short pulses (debouncing)
+	        	bldc_cm->speed = hallCntB_N[motor];     //North pole magnet counter
+	        	moving_counter[motor] = 400;
+	            hallCntB_N[motor] = 0;
+	            A_enc_new[motor] &= ~(1<<1);
+	            debounce_cntA[motor] = 0;
+	            hallState_prev_A2[motor] = 0;
 	          }
 	        }
 	        else{ //hallState_prev_A2 == 0
-	          debounce_cntA--;
+	          debounce_cntA[motor]--;
 	        }
 	      }
-	    if(hallCnt2A_S < ZEROSPEED / 10)
-	      hallCnt2A_S++;
+	    if(hallCntB_S[motor] < ZEROSPEED / 10)
+	      hallCntB_S[motor]++;
 	    else
 	      bldc_cm->speed = ZEROSPEED;
-	    if(hallCnt2A_N < ZEROSPEED / 10)
-	      hallCnt2A_N++;
+	    if(hallCntB_N[motor] < ZEROSPEED / 10)
+	      hallCntB_N[motor]++;
 	    }
 	  }
 
@@ -567,37 +552,37 @@ void DC_QuadEncoder(void){
 	/********************************************
 	    pulse count on A axis ---
 	*********************************************/
-	  if((hall_enable & 0x03) == 0x03) {
-	    switch (A_enc_old) {                                          //swap bits  0...0000 00xx
+	  if(get_Hall_Enable(bldc_cm->index, HALL_ENABLED_BOTH)) {
+	    switch (A_enc_old[motor]) {                                          //swap bits  0...0000 00xx
 	      case 0:
-	        A_enc_temp=0;
+	        A_enc_temp[motor]=0;
 	        break;
 	      case 1:
-	        A_enc_temp=2;
+	        A_enc_temp[motor]=2;
 	        break;
 	      case 2:
-	        A_enc_temp=1;
+	        A_enc_temp[motor]=1;
 	        break;
 	      case 3:
-	        A_enc_temp=3;
+	        A_enc_temp[motor]=3;
 	        break;
 	    }
 	  //--------------------
-	    A_enc_old=A_enc_new;        //new->old
-	    A_enc_temp^=A_enc_new;      //swapped_old EXOR new
+	    A_enc_old[motor]=A_enc_new[motor];        //new->old
+	    A_enc_temp[motor]^=A_enc_new[motor];      //swapped_old EXOR new
 	  //    BKP_WriteBackupRegister(BKP_DR6,H_enc_old);	            //backup - da reset virtualno ne steje impulza
 
-	    switch (A_enc_temp){                                          // direction
+	    switch (A_enc_temp[motor]){                                          // direction
 	      case 0: break;                                              // 00 = no change
 	      case 1: {
-	        if(!(bldc_GetInvertHall(bldc_cm->index)))
+	        if(!(bldc_GetInvertHall(motor)))
 	        	bldc_cm->position++;                                           // 01 = up
 	          else
 	        	bldc_cm->position--;
 	          break;
 	      }
 	      case 2: {                                                   // 10 = down
-	    	  if(!(bldc_GetInvertHall(bldc_cm->index)))
+	    	  if(!(bldc_GetInvertHall(motor)))
 	        	bldc_cm->position--;                                           // 01 = up
 	        else
 	        	bldc_cm->position++;
@@ -608,27 +593,46 @@ void DC_QuadEncoder(void){
 	    }
 	  }
 
-	  if((((hall_enable & 0x03) == 0x01) || ((hall_enable & 0x03) == 0x02))) {
-	    if(A_enc_new != A_enc_old) {
-
-	      if(first_movingA == 1) {
-	        first_movingA = 0;
-	        if (bldc_cm->target < bldc_cm->position || (bldc_cm->ctrl & BLDC_CTRL_HOMING))
-	          moving_dirA = 0;
-	        else if(bldc_cm->target > bldc_cm->position)
-	          moving_dirA = 1;
-	      }
-
-	      if(moving_dirA == 1)
+	  if(get_Hall_Enable(motor, HALL_ENABLED_SINGLE)) {	//Count position when One Hall is used
+	    if(A_enc_new[motor] != A_enc_old[motor]) {
+	      if(bldc_cm->status & BLDC_STATUS_MOVING_OUT)
 	    	  bldc_cm->position += 2;
-	      else if (moving_dirA == 0)
+	      else if (bldc_cm->status & BLDC_STATUS_MOVING_IN || bldc_cm->ctrl & BLDC_CTRL_HOMING)
 	    	  bldc_cm->position -= 2;
 	    }
-
-	    A_enc_old = A_enc_new;
-	    OneHallUsed = 1;
+	    A_enc_old[motor] = A_enc_new[motor];
 	  }
 
+	  /**********************************************************
+	  	Hall loosing pulses detection
+	  **********************************************************/
+	  if(get_Hall_Enable(motor, HALL_ENABLED_BOTH)) {
+	    if(HallCntA[motor] >= HallCntB[motor]) {
+	      if((HallCntA[motor] - HallCntB[motor]) >= HALL_LOST_DETECT)
+	        bldc_cm->status |= BLDC_STATUS_HALL_LOST_IMPULSES;
+	    }
+	    else
+	      if((HallCntB[motor] - HallCntA[motor]) >= HALL_LOST_DETECT)
+	    	  bldc_cm->status |= BLDC_STATUS_HALL_LOST_IMPULSES;
+	  }
+
+}
+
+
+unsigned char get_Hall_Enable(uint8_t motor, uint8_t hall_A_B){
+	if(hall_A_B == HALL_ENABLED_A){
+		return hall_enable & (0x01 << motor);
+	}
+	if(hall_A_B == HALL_ENABLED_B){
+		return hall_enable & (0x02 << motor);
+	}
+	if(hall_A_B == HALL_ENABLED_BOTH && ((hall_enable & (0x03 << motor))== 0x03 << motor)){
+		return 1;
+	}
+	if(hall_A_B == HALL_ENABLED_SINGLE && ( ((hall_enable & (0x03 << motor))== 0x01 << motor) || ((hall_enable & (0x03 << motor))== 0x02 << motor)) ){
+		return 1;
+	}
+	return 0;
 }
 
 

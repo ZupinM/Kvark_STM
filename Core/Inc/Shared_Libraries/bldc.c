@@ -126,7 +126,7 @@ unsigned char ES_1_normallyOpenHi = 0;
 
 unsigned char hall_fault = 0;
 unsigned char hall_detect = 0;
-unsigned char disconnected_motor[2] = {0, 0};
+unsigned int disconnected_motor[BLDC_MOTOR_COUNT];
 unsigned char commutation_counter = 0;
 
 
@@ -188,7 +188,7 @@ int bldc_ReadHall(unsigned char motor){
 
 void bldc_init_motors(int LoadDefaults)
 {
-  if(LoadDefaults) {
+  if(!LoadDefaults) {
     for(int i = 0; i < BLDC_MOTOR_COUNT; i++) {
       //init parameters
       bldc_motors[i].state           = 0;
@@ -374,6 +374,7 @@ void bldc_Stop(int CancelManual){ //stop all motors
 
     bldc_cm->target = bldc_cm->position;
     bldc_motors[i].ctrl = BLDC_CTRL_STOP;
+    HallCntA[i] = HallCntB[i] = 0;
 
     bldc_cm = &bldc_motors[selected_motor];	 //loads previuosly selected motor to finish comutation
 
@@ -1028,6 +1029,9 @@ void voltage_detection() {
 
 uint32_t max_I_A, max_I_B;
 
+uint8_t HallState_prev1[BLDC_MOTOR_COUNT];
+uint8_t HallState_prev2[BLDC_MOTOR_COUNT];
+
 
 //MOTOR core control function
 void bldc_process() {
@@ -1064,24 +1068,37 @@ void bldc_process() {
       bldc_motors[i].status &= ~BLDC_STATUS_MOVING; 
     } 
 
-    //check if motor is disconnected
-    if(bldc_ReadHall(i) == 7 && bldc_motors[i].status & BLDC_STATUS_ACTIVE){
-      disconnected_motor[i]++;
-     if (disconnected_motor[i] > 50){
-        bldc_motors[i].status |= BLDC_STATUS_HALL_FAULT;
-        //bldc_motors[0].status |= BLDC_STATUS_CABLEERROR;
-        bldc_EnableMotor(i,1);
-      } 
-    }else if(disconnected_motor[i]){
-      disconnected_motor[i]--;
-      if(disconnected_motor[i] == 0)
-        bldc_motors[i].status &= ~BLDC_STATUS_HALL_FAULT;
+    //check if BLDC motor is disconnected
+    if(!(bldc_motors[i].state & BLDC_MOTOR_STATE_DC_OPERATION) ){
+		if(bldc_ReadHall(i) == 7 && bldc_motors[i].status & BLDC_STATUS_ACTIVE){
+		  disconnected_motor[i]++;
+		  if (disconnected_motor[i] > 50){
+			bldc_motors[i].status |= BLDC_STATUS_HALL_FAULT;
+			//bldc_motors[0].status |= BLDC_STATUS_CABLEERROR;
+			bldc_EnableMotor(i,0);
+		  }
+		}else if(disconnected_motor[i]){
+		  disconnected_motor[i]--;
+		  if(disconnected_motor[i] == 0){
+			bldc_motors[i].status &= ~BLDC_STATUS_HALL_FAULT;
+		  }
+		}
     }
-  
+
+	if(bldc_motors[i].state & BLDC_MOTOR_STATE_DC_OPERATION  && bldc_motors[i].status & BLDC_STATUS_ACTIVE){	//DC Hall check
+		  if((getHallState1(i) != HallState_prev1[i] || !(hall_enable & (0x01 << 8 * i)) ) && ( getHallState2(i) != HallState_prev2[i] || !(hall_enable & (0x02 << 8 * i)))){
+			  HallState_prev1[i] = getHallState1(i);
+			  HallState_prev2[i] = getHallState2(i);
+			  disconnected_motor[i] = 0;
+			  bldc_motors[i].status &= ~BLDC_STATUS_HALL_FAULT;
+		  }
+		  else if(++disconnected_motor[i] > 2000){
+			bldc_motors[i].status |= BLDC_STATUS_HALL_FAULT;
+			bldc_EnableMotor(i,0);
+			disconnected_motor[i] = 0;
+		  }
+	}
   }
-
-  
-
 
 //switch motors when current motor is finished
 #if BLDC_MOTOR_COUNT > 1
@@ -1251,212 +1268,6 @@ void bldc_process() {
       bldc_cm->ctrl = BLDC_CTRL_IDLE;  
       ActivateDrivers(0);
     }
-  }
-
-}
-
-int hallDCount = 0;
-int posPrev = 0;
-int ctrlPrev = BLDC_CTRL_IDLE;
-void dc_process() {
-
-  bldc_runout(RUNOUT_FREEWHEEL);
-
-  if (bldc_GetInvertHall(0))
-    cflags |= 1<<swap_halls_A;
-  else cflags &= ~(1<<swap_halls_A);
-
-  if (bldc_GetInvertHall(1))
-    cflags |= 1<<swap_halls_B;
-  else cflags &= ~(1<<swap_halls_B);
-
-  if (bldc_GetInvert(0))
-    cflags |= 1<<SwapRotation_A;
-  else cflags &= ~(1<<SwapRotation_A);
-
-  if (bldc_GetInvert(1))
-    cflags |= 1<<SwapRotation_B;
-  else cflags &= ~(1<<SwapRotation_B);
-
-
-  any_motor_moving = 0;	
-  for(int i=0 ; i<BLDC_MOTOR_COUNT ; i++){
-
-    if(moving_counter[i]){                          // BLDC_STATUS_MOVING	
-      moving_counter[i] --;	
-      any_motor_moving = 1;	
-    }	
-  }
-
-
-//switch motors when current motor is finished	
-#if BLDC_MOTOR_COUNT > 1	
-  if( (target_error(bldc_cm->index) < BLDC_DEADBAND) && (target_error(NEXT_MOTOR(bldc_cm->index)) > BLDC_DEADBAND) && (!any_motor_moving)){
-    bldc_Stop(0);	
-    for(int i=0 ; i<2000000 ; i++);	
-    bldc_cm = &bldc_motors[NEXT_MOTOR(bldc_cm->index)];
-    bldc_cm->ctrl = BLDC_CTRL_TRACKING;	
-  }	
-#endif
-  voltage_detection();	
-  Flag_check();	
- // bldc_motor *bldc_cm = &bldc_motors[1];	
-  //***control disabled error state*** 	
- if(bldc_status & BLDC_LOCKED || !(bldc_cm->state & BLDC_MOTOR_STATE_ENABLED) || bldc_cm->status & BLDC_STATUS_ERR) {	
-    ActivateDrivers(0);	
-    bldc_pause = 0;	
-    bldc_cm->ctrl = BLDC_CTRL_IDLE;	
-    bldc_cm->target = bldc_cm->position;	
-    return;	
-  }
-
-  //****over current detection****	
-  float ILimit;	
-  if (bldc_runtime < bldc_cm->I_Inrush_time)	
-    ILimit = bldc_cm->I_limit *  bldc_cm->I_Inrush_ratio;	
-  else if(bldc_cm->status & BLDC_STATUS_WIND_MODE)	
-    ILimit = bldc_cm->I_limit *  1.3;	
-  else	
-    ILimit = bldc_cm->I_limit;	
-  	
-  if( GetAnalogValues(MotorSelectI(bldc_cm->index)) >= ILimit) {
-    SetEventParameters(bldc_cm->index);	
-  	
-    ActivateDrivers(0); //stop motor now	
-  	
-    bldc_cm->i_err_cnt++;	
-    if(bldc_cm->i_err_cnt>=1) bldc_cm->status |= BLDC_STATUS_ERR | BLDC_STATUS_OVERCURRENT;	
-    else bldc_pause = 3 * 1000; //5s timeout	
-    return;	
-  }
-
-  //****cable error detection****	
-  if(bldc_cm->status & BLDC_STATUS_ACTIVE && bldc_cm->status & BLDC_STATUS_STALL && abs(bldc_pwm)>=0xa00){	
-    SetEventParameters(bldc_cm->index);	
-    ActivateDrivers(0);	
-    bldc_cm->status |= BLDC_STATUS_ERR | BLDC_STATUS_CABLEERROR;	
-    return;	
-  }	
-  //****end switch error detection****	
-  if(bldc_HomeSwitchActive(bldc_cm->index,0) && bldc_cm->ctrl == BLDC_CTRL_TRACKING && bldc_cm->position > bldc_position_to_pulses(bldc_cm->index, bldc_cm->end_switchDetect - 0.1)){	
-    SetEventParameters(bldc_cm->index);	
-    ActivateDrivers(0);	
-    bldc_cm->status|= BLDC_STATUS_ENDSWITCH_ERROR;	
-    return;	
-  }	
-  if(bldc_HomeSwitchActive(bldc_cm->index,1) && bldc_cm->ctrl == BLDC_CTRL_TRACKING && bldc_cm->position > bldc_position_to_pulses(bldc_cm->index, bldc_cm->end_switchDetect - 0.1)){	
-    SetEventParameters(bldc_cm->index);	
-    ActivateDrivers(0);	
-    bldc_cm->status|= BLDC_STATUS_ENDSWITCH_ERROR;	
-    return;	
-  }	
-    	
-  //****end switch detection****
-  if(bldc_HomeSwitchActive(bldc_cm->index,0) && bldc_cm->ctrl & BLDC_CTRL_HOMING) {
-    ActivateEvent(EVENT_HOME_A_FINISHED);
-    bldc_cm->ctrl = BLDC_CTRL_IDLE;
-    bldc_cm->home_remaining = bldc_cm->position;
-    bldc_cm->position = bldc_cm->target = 0;
-    ctrlPrev = BLDC_CTRL_HOMING;
-    bldc_Stop(1);
-    return;
-  }
-
-		
-  //****Invert direction of rotation or hall****	
-  if(!(bldc_motors[0].status & BLDC_STATUS_MOVING) && (bldc_motors[0].state & BLDC_MOTOR_STATE_INVERT_DIRECTION_REQUEST)){ //After motor A stoped moving	
-    bldc_motors[0].state &= ~BLDC_MOTOR_STATE_INVERT_DIRECTION_REQUEST;	
-    if(bldc_motors[0].state & BLDC_MOTOR_STATE_INVERT_DIRECTION_REQUEST_STATE)	
-      bldc_motors[0].state |= BLDC_MOTOR_STATE_INVERT_DIRECTION;	
-    else	
-      bldc_motors[0].state &= ~BLDC_MOTOR_STATE_INVERT_DIRECTION;	
-  }	
-  if(!(bldc_motors[0].status & BLDC_STATUS_MOVING) && (bldc_motors[0].state & BLDC_MOTOR_STATE_INVERT_HALL_REQUEST)){ //After motor A stoped moving	
-    bldc_motors[0].state &= ~BLDC_MOTOR_STATE_INVERT_HALL_REQUEST;	
-    if(bldc_motors[0].state & BLDC_MOTOR_STATE_INVERT_HALL_REQUEST_STATE)	
-      bldc_motors[0].state |= BLDC_MOTOR_STATE_INVERT_DIRECTION;   	
-    else	
-      bldc_motors[0].state &= ~BLDC_MOTOR_STATE_INVERT_DIRECTION; 	
-  }	
-  if(!(bldc_motors[1].status & BLDC_STATUS_MOVING) && (bldc_motors[1].state & BLDC_MOTOR_STATE_INVERT_DIRECTION_REQUEST)){ //After motor B stoped moving	
-    bldc_motors[1].state &= ~BLDC_MOTOR_STATE_INVERT_DIRECTION_REQUEST;	
-    if(bldc_motors[1].state & BLDC_MOTOR_STATE_INVERT_DIRECTION_REQUEST_STATE)	
-      bldc_motors[1].state |= BLDC_MOTOR_STATE_INVERT_DIRECTION;	
-    else	
-      bldc_motors[1].state &= ~BLDC_MOTOR_STATE_INVERT_DIRECTION;	
-  }	
-  if(!(bldc_motors[1].status & BLDC_STATUS_MOVING) && (bldc_motors[1].state & BLDC_MOTOR_STATE_INVERT_HALL_REQUEST)){ //After motor B stoped moving	
-    bldc_motors[1].state &= ~BLDC_MOTOR_STATE_INVERT_HALL_REQUEST;	
-    if(bldc_motors[1].state & BLDC_MOTOR_STATE_INVERT_HALL_REQUEST_STATE)	
-      bldc_motors[1].state |= BLDC_MOTOR_STATE_INVERT_DIRECTION;   	
-    else	
-      bldc_motors[1].state &= ~BLDC_MOTOR_STATE_INVERT_DIRECTION; 	
-  }	
-  //*************************************************************	
-
-  // Homing timeout
-  if(bldc_cm->ctrl == BLDC_CTRL_HOMING && bldc_cm->homing_time >= (bldc_cfg.homing_timeout * 1000)) {
-    bldc_cm->status |= BLDC_STATUS_ERR | BLDC_STATUS_HOME_TIMEOUT;
-    bldc_Stop(1);
-  }
-
-  //***Process control function*****	
-  if(bldc_cm->ctrl & BLDC_CTRL_STOP) { //STOP REQUEST	
-    bldc_cm->target = bldc_cm->position;                    //force ramp down	
-  }else if(bldc_cm->ctrl == BLDC_CTRL_HOMING) {
-    bldc_cm->target = bldc_cm->position - bldc_position_to_pulses(0, 10);      //set destination negative
-    bldc_cm->homing_time++;
-  }
-
-  //motor_rampDC();
-
-  if (!any_motor_moving) {  //deactivate drivers
-    bldc_idletime++;
-    if(bldc_idletime>=100) {
-      bldc_idletime = 100;
-      bldc_cm->ctrl = BLDC_CTRL_IDLE;  
-      ActivateDrivers(0);
-    }
-  } 
-  else if(!(bldc_motors[0].status & BLDC_STATUS_MOVING) && !(bldc_motors[1].status & BLDC_STATUS_MOVING))
-    any_motor_moving = 0;
-
-
-  if (bldc_cm->ctrl == BLDC_CTRL_STOP) {
-    ActivateDrivers(0);
-  }
-
-  mosfet_protection_cnt = 0;
-
-  Flag_check();
-
-  // check all hall disconnected detection
-  if(bldc_cm->status & BLDC_STATUS_MOVING) {
-
-    hallDCount++;
-    if (hallDCount >= 1000) {
-
-      any_motor_moving = 1;
-
-      if (posPrev != 0 && posPrev == bldc_cm->position) {
-
-        if (ctrlPrev == BLDC_CTRL_HOMING) {
-          bldc_ClearStatus();
-          ctrlPrev = BLDC_CTRL_IDLE;
-        }
-
-        bldc_Stop(0);
-        bldc_EnableMotor(bldc_cm->index, 0);
-      }
-
-      posPrev = bldc_cm->position;
-      hallDCount = 0;
-    }
-      
-  }
-  else {
-    hallDCount = 0;
-    posPrev = 0;
   }
 
 }

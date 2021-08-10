@@ -17,7 +17,7 @@
 #include "gpio.h"
 
 
-#define FLASH_USER_SIZE 180     //size in floats
+#define FLASH_USER_SIZE 200     //size in floats
 #define FLASH_USER_PAGE_1 254 //burned?
 //#define FLASH_USER_PAGE_1 252
 #define FLASH_ROW_SIZE 32  		// 32 Double Words

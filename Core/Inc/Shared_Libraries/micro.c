@@ -551,7 +551,7 @@ double  RtoD(double radians)
 // azimuthD [-k*180, +k*180] stopinje - azimut sonca (smer J proti Z)
 // elevationD (0, 180) stopinje - elevacija sonca
 // deviationD [-360, 360] stopinje - odklon smeri sledilnika od smeri J proti Z (J-S = 0, Z-V = 90)  //rotacija na ravnini
-// inclinationD [-90, 90] stopinje - !koti nat 45Â° so vpraÅ¡ljivi in mogoÄe zahtevajo drugo metodo sledenja! rotacija pravokotno na ravnino
+// inclinationD [-90, 90] stopinje - !koti nat 45Â° so vpraÅ¡ljivi in mogoÄe zahtevajo drugo methodo sledenja! rotacija pravokotno na ravnino
 // return (-90, 90) stopinje - rotacija sledilnika (0 = polje celic vodoravno)
 double IdealRotationAngle(double azimuthD, double elevationD, double deviationD, double inclinationD)
 {

@@ -4,7 +4,7 @@
 #include "adc.h"
 #include "position.h"
 
-#define BLDC_MOTOR_COUNT 2
+#define BLDC_MOTOR_COUNT 4
 
 
 typedef struct{
@@ -84,7 +84,8 @@ extern bldc_motor bldc_motors[BLDC_MOTOR_COUNT];
 
 #define BLDC_STATUS_ERR          (1<<6)//global error flag
 #define BLDC_STATUS_OVERCURRENT  (1<<7)
-#define BLDC_STATUS_HALL_FAULT   (1<<8)
+#define BLDC_STATUS_HALL_FAULT   (1<<8)//no signal
+#define BLDC_STATUS_HALL_LOST_IMPULSES   (1<<20)//Loosing Impulses
 #define BLDC_STATUS_HOME_TIMEOUT (1<<9)
 #define BLDC_STATUS_CABLEERROR   (1<<10)
 
@@ -100,7 +101,7 @@ extern bldc_motor bldc_motors[BLDC_MOTOR_COUNT];
 
 #define BLDC_STATUS_TO_DST_ERR       (1<<19)
 
-#define BLDC_STATUS_CLEARMASK (BLDC_STATUS_ERR|BLDC_STATUS_STALL|BLDC_STATUS_OVERCURRENT|BLDC_STATUS_CABLEERROR|BLDC_STATUS_HALL_FAULT|BLDC_STATUS_HOME_TIMEOUT|BLDC_STATUS_ENDSWITCH_ERROR|BLDC_STATUS_TO_DST_ERR)
+#define BLDC_STATUS_CLEARMASK (BLDC_STATUS_ERR|BLDC_STATUS_STALL|BLDC_STATUS_HALL_LOST_IMPULSES|BLDC_STATUS_OVERCURRENT|BLDC_STATUS_CABLEERROR|BLDC_STATUS_HALL_FAULT|BLDC_STATUS_HOME_TIMEOUT|BLDC_STATUS_ENDSWITCH_ERROR|BLDC_STATUS_TO_DST_ERR)
 
 //bldc_status
 //#define BLDC_INIT               (1U<<7)
@@ -191,6 +192,9 @@ unsigned int bldc_GetEnabledMotors();
 int          bldc_Enabled(unsigned char motor);
 unsigned int bldc_GetInvert(unsigned char motor);
 unsigned int bldc_GetInvertHall(unsigned char motor);
+
+extern int HallCntA[BLDC_MOTOR_COUNT];
+extern int HallCntB[BLDC_MOTOR_COUNT];
 
 
 void bldc_init(int LoadDefaults);

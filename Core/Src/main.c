@@ -1371,6 +1371,17 @@ void tracker_status_check(){
     tracker_status&=~ERR_HALL_A;
     backup_timeout=BACKUP_TO;
   }
+
+  /* HALL-A Loosing impulses - sproti se osvezuje */
+  if ((bldc_motors[0].status& BLDC_STATUS_HALL_LOST_IMPULSES)&&(!(tracker_status&SF_HALL_WIRING_A))) {
+    tracker_status|=SF_HALL_WIRING_A;
+    backup_timeout=BACKUP_TO;
+  }
+  if ((!(bldc_motors[0].status& BLDC_STATUS_HALL_LOST_IMPULSES))&&(tracker_status&SF_HALL_WIRING_A)) {
+    tracker_status&=~SF_HALL_WIRING_A;
+    backup_timeout=BACKUP_TO;
+  }
+
   /* napaka HALL-a B - sproti se osvezuje */
   if ((bldc_motors[1].status& BLDC_STATUS_HALL_FAULT)&&(!(tracker_status&ERR_HALL_B))) {
     tracker_status|=ERR_HALL_B;
@@ -1380,6 +1391,17 @@ void tracker_status_check(){
     tracker_status&=~ERR_HALL_B;
     backup_timeout=BACKUP_TO;
   }
+
+  /* HALL-B Loosing impulses - sproti se osvezuje */
+  if ((bldc_motors[1].status& BLDC_STATUS_HALL_LOST_IMPULSES)&&(!(tracker_status&SF_HALL_WIRING_B))) {
+    tracker_status|=SF_HALL_WIRING_B;
+    backup_timeout=BACKUP_TO;
+  }
+  if ((!(bldc_motors[1].status& BLDC_STATUS_HALL_LOST_IMPULSES))&&(tracker_status&SF_HALL_WIRING_B)) {
+    tracker_status&=~SF_HALL_WIRING_B;
+    backup_timeout=BACKUP_TO;
+  }
+
   /* napaka KABLA A - sproti se osvezuje */
   if ((bldc_motors[0].status & BLDC_STATUS_CABLEERROR)&&(!(tracker_status&ERR_CABLE_A))) {
     tracker_status|=ERR_CABLE_A;
