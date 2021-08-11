@@ -342,12 +342,12 @@ float GetAnalogValues(unsigned char measuring_point) {
   HFocavg = HFocavg + ( (int)(g_ADCBuffer[7] - HFocavg)*0.01);//integrator
 #endif
 
-  if(!(bldc_motors[0].status & BLDC_STATUS_MOVING)){ // get adc current reading in inactive states, to compensate op.amp offset
+  if(!(bldc_motors[0].status & BLDC_STATUS_MOVING) && !(bldc_motors[2].status & BLDC_STATUS_MOVING)){ // get adc current reading in inactive states, to compensate op.amp offset
     zeroCurrent_voltage_0 += (int)(g_ADCBuffer[2] - zeroCurrent_voltage_0)*0.001;
     Iavg_A = 0;
   }
 #if DEVICE == KVARK
-  if(!(bldc_motors[1].status & BLDC_STATUS_MOVING)){
+  if(!(bldc_motors[1].status & BLDC_STATUS_MOVING) && !(bldc_motors[3].status & BLDC_STATUS_MOVING)){
     zeroCurrent_voltage_1 += (int)(g_ADCBuffer[4] - zeroCurrent_voltage_1)*0.001;
     Iavg_B = 0;
   }

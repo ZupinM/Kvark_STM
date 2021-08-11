@@ -272,7 +272,7 @@ void flash_read (unsigned int read_address) {
   tracker_status    = flash_backup_ui[2];
   tracker_exstatus  = flash_backup_ui[3];
 
-#if BLDC_MOTOR_COUNT == 2
+#if BLDC_MOTOR_COUNT > 1
   //bldc_motor *mb = bldc_Motor(1);
   //mb->position                 = flash_backup[40];
 #endif
@@ -468,7 +468,7 @@ int flash_write(unsigned int write_address) {
   }
 
 
-//#if BLDC_MOTOR_COUNT == 2
+#if BLDC_MOTOR_COUNT > 1
   // Motor B driving settings
   bldc_motor *mb = bldc_Motor(1);
 
@@ -548,7 +548,7 @@ int flash_write(unsigned int write_address) {
     flash_backup[53] = mb->speed_freewheel;
     upgrExe = 1;
   }
-//#endif
+#endif
 
 #if BLDC_MOTOR_COUNT > 2
    mb = bldc_Motor(2);

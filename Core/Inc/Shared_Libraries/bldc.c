@@ -188,7 +188,7 @@ int bldc_ReadHall(unsigned char motor){
 
 void bldc_init_motors(int LoadDefaults)
 {
-  if(!LoadDefaults) {
+  if(LoadDefaults) {
     for(int i = 0; i < BLDC_MOTOR_COUNT; i++) {
       //init parameters
       bldc_motors[i].state           = 0;
@@ -795,8 +795,27 @@ void bldc_update_pwm(unsigned short value) {
 
 int bldc_HomeSwitchActive(unsigned char motor , unsigned char switch_h_l) {
 
+  if(bldc_cm->state & BLDC_MOTOR_STATE_DC_OPERATION){	// DC Motors --One Low Switch per Port
+	  if(motor == 0 || motor == 2){
+#if DEVICE != PICO
+		if(!ES_0_normallyOpenLo && !switch_h_l)
+		  return(!HAL_GPIO_ReadPin(END_SW_A_HI_GPIO_Port, END_SW_A_HI_Pin));
+		else if(ES_0_normallyOpenLo && !switch_h_l)
+			return(HAL_GPIO_ReadPin(END_SW_A_HI_GPIO_Port, END_SW_A_HI_Pin));
+#endif
+	  }
 
-  if (motor == 0){
+	  if(motor == 1 || motor == 3){
+		if(!ES_1_normallyOpenLo && !switch_h_l)
+			return(!HAL_GPIO_ReadPin(END_SW_B_HI_GPIO_Port, END_SW_B_HI_Pin));
+		else if(ES_1_normallyOpenLo && !switch_h_l)
+			return(HAL_GPIO_ReadPin(END_SW_B_HI_GPIO_Port, END_SW_B_HI_Pin));
+	  }
+	  return 0;
+  }
+
+
+  if (motor == 0){										//BLDC Motors -- Low and High switch for every motor
 #if DEVICE != PICO
     if(!ES_0_normallyOpenLo && !switch_h_l)
       return(HAL_GPIO_ReadPin(END_SW_A_LO_GPIO_Port, END_SW_A_LO_Pin));
@@ -1162,14 +1181,14 @@ void bldc_process() {
     bldc_cm->status|= BLDC_STATUS_ENDSWITCH_ERROR;
     //return;
   }
-
+#if BLDC_MOTOR_COUNT < 3
   if(bldc_HomeSwitchActive(bldc_cm->index,1) && bldc_cm->ctrl == BLDC_CTRL_TRACKING && bldc_cm->position <  bldc_position_to_pulses(bldc_cm->index, (bldc_cm->max_position -bldc_cm->end_switchDetect - 0.1)) ){
     SetEventParameters(bldc_cm->index);
     //ActivateDrivers(0);
     bldc_cm->status|= BLDC_STATUS_ENDSWITCH_ERROR;
     //return;
   }
-    
+#endif
   //****end switch detection****
 
   if(bldc_HomeSwitchActive(bldc_cm->index,0) && bldc_cm->ctrl & BLDC_CTRL_HOMING) {
@@ -1189,14 +1208,14 @@ void bldc_process() {
     ActivateDrivers(0);
     return;
   }
-
+#if BLDC_MOTOR_COUNT < 3
   if(bldc_HomeSwitchActive(bldc_cm->index,1) && bldc_cm->target > bldc_cm->position){
     bldc_cm->target = bldc_cm->position;
     bldc_cm->ctrl = BLDC_CTRL_STOP;
     ActivateDrivers(0);
     return;
   }
-
+#endif
 
   //****Invert direction of rotation or hall****
   if(!(bldc_motors[0].status & BLDC_STATUS_MOVING) && (bldc_motors[0].state & BLDC_MOTOR_STATE_INVERT_DIRECTION_REQUEST)){ //After motor A stoped moving

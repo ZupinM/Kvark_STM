@@ -24,6 +24,6 @@ void motor_handler(void);
 void DC_QuadEncoder(void);
 GPIO_PinState getHallState1(unsigned char index);
 GPIO_PinState getHallState2(unsigned char index);
-unsigned char get_Hall_Enable(uint8_t motor, uint8_t hall_A_B);
+unsigned int get_Hall_Enable(uint8_t motor, uint8_t hall_A_B);
 
 #endif

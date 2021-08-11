@@ -178,7 +178,7 @@ uint8_t init_main_state = 1;
 extern volatile unsigned int number_of_poles;
 
 unsigned int motor_operation;
-unsigned int hall_enable = (0x03 | 0x03 << 16);
+unsigned int hall_enable = (0x03 | 0x03 << 8 | 0x03 << 16 | 0x03 << 24);
 
 //fixed loaction in flash for version and checksum
 __attribute__ ((section (".appver")))
@@ -605,8 +605,8 @@ int main(void)
 	    	huart1.gState != HAL_UART_STATE_BUSY && huart1.RxState != HAL_UART_STATE_BUSY_RX && //UART is IDLE
 	       (uartMode == UART_MODE_RS485 || uartMode == UART_MODE_XBEE))))
 	     {
-	       if((UARTBuffer0[0] == LoRa_id || UARTBuffer0[0] == slave_addr || UARTBuffer0[0] == 0)
-	           && uartMode == UART_MODE_RS485){
+	       if((UARTBuffer0[0] == LoRa_id || UARTBuffer0[0] == slave_addr || UARTBuffer0[0] == 0 || ((UARTBuffer0[0] == slave_addr+1) && (BLDC_MOTOR_COUNT > 2)))
+	           && uartMode == UART_MODE_RS485 ){
 	         modbus_cmd();              // 485 received from Sigma, Answer KVARK data, 485->Sigma
 	         modbus_ReqProcessed();      // re-enable reception
 	         rxOffline_counter = 10000;
@@ -658,7 +658,7 @@ int main(void)
 
 	       if(checkRouting && !rs485_forward_enabled)
 	         check_routing();
-	       if(module.packetReady && (module.rxBuffer[0] == LoRa_id || module.rxBuffer[0] == slave_addr || module.rxBuffer[0] == 0)){
+	       if(module.packetReady && (module.rxBuffer[0] == LoRa_id || module.rxBuffer[0] == slave_addr || module.rxBuffer[0] == 0 || ((module.rxBuffer[0] == slave_addr+1) && (BLDC_MOTOR_COUNT > 2)))){
 	         modbus_cmd ();         //LoRa receive, KVARK response
 	         modbus_ReqProcessed(); //re-enable reception
 	       }
@@ -973,6 +973,8 @@ void StatusUpdate() {
   int bldcs = bldc_Status();
   bldc_motor *ma = bldc_Motor(0);
   bldc_motor *mb = bldc_Motor(1);
+  bldc_motor *m2 = bldc_Motor(2);
+  bldc_motor *m3 = bldc_Motor(3);
 
   tracker_status &= ~(0xff| SF_MOVING_OUT_A | SF_MOVING_IN_A | SF_MOVING_REF_CLR_A | SF_ENDSW_A_LO_PRESSED | SF_ENDSW_A_HI_PRESSED | SF_MOVING_OUT_B | SF_MOVING_IN_B | SF_MOVING_REF_CLR_B | SF_ENDSW_B_LO_PRESSED | SF_ENDSW_B_HI_PRESSED);
 
@@ -1000,16 +1002,20 @@ void StatusUpdate() {
   else
     tracker_exstatus &= ~EFS_BATTERY_LOW;
 
-  if(motor_operation & 0x0002) // MA DC motor operation
+  if(motor_operation & 0x0002){ // MA DC motor operation
     ma->state |= BLDC_MOTOR_STATE_DC_OPERATION;
-  else
+    m2->state |= BLDC_MOTOR_STATE_DC_OPERATION;
+  }else{
     ma->state &= ~BLDC_MOTOR_STATE_DC_OPERATION;
-
-  if(motor_operation & 0x10000) // MB DC motor operation
+    m2->state &= ~BLDC_MOTOR_STATE_DC_OPERATION;
+  }
+  if(motor_operation & 0x10000){ // MB DC motor operation
     mb->state |= BLDC_MOTOR_STATE_DC_OPERATION;
-  else
+    m3->state |= BLDC_MOTOR_STATE_DC_OPERATION;
+  }else{
     mb->state &= ~BLDC_MOTOR_STATE_DC_OPERATION;
-
+    m3->state &= ~BLDC_MOTOR_STATE_DC_OPERATION;
+  }
   tracker_status |= (mb->status >> 3) & 0xf0; //error flags
   //if(mb->status & BLDC_STATUS_HALL_FAULT)
    // tracker_status |= ERR_HALL_B;

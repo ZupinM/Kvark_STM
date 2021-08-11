@@ -110,6 +110,7 @@ char commShort = 1;
 char commBuff1;
 uint8_t writePacket1[0x80];
 uint8_t writePacket2[0x80];
+uint8_t slave_addr_l;
 #define MODE_NORMAL 0
 #define MODE_BOOT 1
 #define MODE_UPGRADE 2
@@ -175,6 +176,7 @@ void modbus_cmd() {
 
   if ((UARTCount0 > 0) && (
    (UARTBuffer0[0] == slave_addr) ||
+   (UARTBuffer0[0] == slave_addr+1 && BLDC_MOTOR_COUNT > 2) ||
    (UARTBuffer0[0] == LoRa_id && transceiver == LORA) ||
    (broadcastID == BROADCAST_CALL) ||
    (UARTBuffer0[0] != slave_addr && transceiver == XBEE && ((UARTBuffer0[1] == CMD_RUN_GET_VOLTAGE || UARTBuffer0[1] == CMD_RUN_GET_LOADER_VER ||
@@ -205,6 +207,19 @@ void modbus_cmd() {
       }
 
 //////////////////////////////////////////****NANO RESPONSE*****////////////////////////////////////////////////
+      slave_addr_l = slave_addr;
+      uint8_t motor_A = 0;
+      uint8_t motor_B = 1;
+      if(BLDC_MOTOR_COUNT > 2){
+    	  motor_A = 0;							//Motor Port 1 selected
+    	  motor_B = 2;
+		  if(UARTBuffer0[0] == slave_addr+1){
+			  slave_addr_l++;
+			  motor_A = 1;						//Motor Port 2 selected
+			  motor_B = 3;
+			  //Check2ndPortParameters();
+		  }
+      }
       switch (UARTBuffer0[1]) {
         // reset 
         case MCD_W_reset: {					 	
@@ -220,7 +235,7 @@ void modbus_cmd() {
 
           read_int_buf[0] = tracker_status;
           read_int_buf[1] = tracker_exstatus;
-          number_TX_bytes0 = mcmd_read_int(2, slave_addr);
+          number_TX_bytes0 = mcmd_read_int(2, slave_addr_l);
           break;
         }
         // Clear STATUS
@@ -286,19 +301,25 @@ void modbus_cmd() {
           break;
         }
         // IMOTOR
-        case MCMD_R_Imotor: {					   
-          number_TX_bytes0 = mcmd_read_float(GetAnalogValues(MotorSelectI(bldc_cm->index)), (char *)UARTBuffer0);
+        case MCMD_R_Imotor: {
+          uint8_t I_port = bldc_cm->index;
+          if(BLDC_MOTOR_COUNT > 2  && slave_addr != slave_addr_l){
+        	  I_port = 1;
+          }else if(BLDC_MOTOR_COUNT > 2  && slave_addr == slave_addr_l){
+        	  I_port = 0;
+          }
+          number_TX_bytes0 = mcmd_read_float(GetAnalogValues(MotorSelectI(I_port)), (char *)UARTBuffer0);
           break;
         }
 
         case MCMD_R_MSpeed: {		
           read_int_buf[0] = bldc_Speed;		
-          number_TX_bytes0 = mcmd_read_int(1, slave_addr);		
+          number_TX_bytes0 = mcmd_read_int(1, slave_addr_l);
           break;		
         }		
         case MCMD_R_NPoles: {		
           read_int_buf[0] = number_of_poles;		
-          number_TX_bytes0 = mcmd_read_int(1, slave_addr);
+          number_TX_bytes0 = mcmd_read_int(1, slave_addr_l);
           break;		
         }		
         case MCMD_W_NPoles: {
@@ -316,7 +337,7 @@ void modbus_cmd() {
           read_int_buf[1] = SN[1];
           read_int_buf[2] = SN[2];
           read_int_buf[3] = SN[3];
-          number_TX_bytes0 = mcmd_read_int(4, slave_addr);
+          number_TX_bytes0 = mcmd_read_int(4, slave_addr_l);
           break;
         }
         // VERSION
@@ -332,7 +353,7 @@ void modbus_cmd() {
           read_int_buf[1] = BOOT_DEVTYPE;
           read_int_buf[2] = BOOT_HW_REV;
           read_int_buf[3] = BOOT_APP_MINVERSION;
-          number_TX_bytes0 = mcmd_read_int(4, slave_addr);
+          number_TX_bytes0 = mcmd_read_int(4, slave_addr_l);
           break;
         }
         // REMAIN IMPULSES A
@@ -340,7 +361,7 @@ void modbus_cmd() {
           number_TX_bytes0 = mcmd_read_float(bldc_remaining(0), (char *)UARTBuffer0);
           break;
         }
-#if BLDC_MOTOR_COUNT == 2
+#if BLDC_MOTOR_COUNT > 1
         // REMAIN IMPULSES B
         case MCMD_R_remain_B: {                         // ostanek impulzov do 0000 od zadnjega REF			 							
           number_TX_bytes0 = mcmd_read_float(bldc_remaining(1), (char *)UARTBuffer0);
@@ -350,7 +371,7 @@ void modbus_cmd() {
         case MCMD_R_events: {
           read_int_buf[0] = events;
           events = 0;
-          number_TX_bytes0 = mcmd_read_int(1, slave_addr);
+          number_TX_bytes0 = mcmd_read_int(1, slave_addr_l);
           tracker_exstatus &= ~EFS_EVENTS_ACTIVE;
           events = 0;
           break;
@@ -365,10 +386,10 @@ void modbus_cmd() {
           read_int_buf[5] = 0;
           read_int_buf[6] = 0;
           read_int_buf[7] = 0;
-          number_TX_bytes0 = mcmd_read_int(8, slave_addr);
+          number_TX_bytes0 = mcmd_read_int(8, slave_addr_l);
           break;
         }
-#if BLDC_MOTOR_COUNT == 2
+#if BLDC_MOTOR_COUNT > 1
         case  MCMD_R_errorB_stats: {			
           read_int_buf[0] = fsendval( err_currentB );
           read_int_buf[1] = fsendval( err_voltageB );
@@ -378,7 +399,7 @@ void modbus_cmd() {
           read_int_buf[5] = 0;
           read_int_buf[6] = 0;
           read_int_buf[7] = 0;
-          number_TX_bytes0 = mcmd_read_int(8, slave_addr);
+          number_TX_bytes0 = mcmd_read_int(8, slave_addr_l);
           break;
         }
 #endif
@@ -396,12 +417,12 @@ void modbus_cmd() {
         }
         // R POSITION A
         case MCMD_R_position_A: {					
-          number_TX_bytes0 = mcmd_read_float(bldc_position(0), (char *)UARTBuffer0);
+          number_TX_bytes0 = mcmd_read_float(bldc_position(motor_A), (char *)UARTBuffer0);
           break;
         }
         // R DESTINATION A
         case MCMD_R_destination_A: {														
-          number_TX_bytes0 = mcmd_read_float(bldc_target(0), (char *)UARTBuffer0);
+          number_TX_bytes0 = mcmd_read_float(bldc_target(motor_A), (char *)UARTBuffer0);
           break;
         }
         // W DESTINATION A
@@ -415,7 +436,7 @@ void modbus_cmd() {
 	      bldc_manual(0);  // mzp
 		  usb_drive = 0;
         
-          int res = bldc_setPosition(0, mcmd_write_float1(), windmode);
+          int res = bldc_setPosition(motor_A, mcmd_write_float1(), windmode);
 
           if (res ==  0) {
             ack_reply();
@@ -438,7 +459,7 @@ void modbus_cmd() {
           if((rxcnt == 7) && (UARTBuffer0[6]))
             windmode = 1;
 
-          int res = bldc_setPositionImp(0, mcmd_write_int1(), windmode);
+          int res = bldc_setPositionImp(motor_A, mcmd_write_int1(), windmode);
 
           if(res ==  0){
             ack_reply();
@@ -458,7 +479,7 @@ void modbus_cmd() {
         case MCMD_W_ref_A: {
           bldc_manual(0);  // mzp   
           usb_drive = 0;
-          int res = bldc_Home(0);
+          int res = bldc_Home(motor_A);
           if (res == 0) {
             ack_reply();
           }
@@ -468,15 +489,15 @@ void modbus_cmd() {
           }
           break;
         }
-#if BLDC_MOTOR_COUNT == 2
+#if BLDC_MOTOR_COUNT > 1
         // R POSITION B
         case MCMD_R_position_B: {					
-          number_TX_bytes0 = mcmd_read_float(bldc_position(1), (char *)UARTBuffer0);
+          number_TX_bytes0 = mcmd_read_float(bldc_position(motor_B), (char *)UARTBuffer0);
           break;
         }
         // R DESTINATION B
         case MCMD_R_destination_B: {														
-          number_TX_bytes0 = mcmd_read_float(bldc_target(1), (char *)UARTBuffer0);
+          number_TX_bytes0 = mcmd_read_float(bldc_target(motor_B), (char *)UARTBuffer0);
           break;
         }
         // W DESTINATION B
@@ -486,7 +507,7 @@ void modbus_cmd() {
           if((rxcnt == 7) && (UARTBuffer0[6])) windmode = 1;
           bldc_manual(0);  // mzp
           usb_drive = 0;
-          int res = bldc_setPosition(1, mcmd_write_float1(), windmode);
+          int res = bldc_setPosition(motor_B, mcmd_write_float1(), windmode);
 
           if(res ==  0) {
             ack_reply();
@@ -509,7 +530,7 @@ void modbus_cmd() {
           if((rxcnt == 7) && (UARTBuffer0[6]))
             windmode = 1;
 
-          int res = bldc_setPositionImp(1, mcmd_write_int1(), windmode);
+          int res = bldc_setPositionImp(motor_B, mcmd_write_int1(), windmode);
 
           if(res ==  0) {
             ack_reply();
@@ -529,7 +550,7 @@ void modbus_cmd() {
         case MCMD_W_ref_B: {
           bldc_manual(0);  // mzp
           usb_drive  = 0;
-          int res = bldc_Home(1);
+          int res = bldc_Home(motor_B);
           if(res == 0) {
             ack_reply();
           }
@@ -543,7 +564,7 @@ void modbus_cmd() {
 
         case MCMD_R_HallState: {
           read_int_buf[0] = hall_enable;
-          mcmd_read_int(1, slave_addr);
+          mcmd_read_int(1, slave_addr_l);
           break;
         }
 
@@ -559,7 +580,7 @@ void modbus_cmd() {
 
         case MCMD_R_AxisState: {
           read_int_buf[0] = bldc_GetEnabledMotors();
-          number_TX_bytes0 = mcmd_read_int(1, slave_addr);
+          number_TX_bytes0 = mcmd_read_int(1, slave_addr_l);
           break;
         }
 
@@ -653,7 +674,7 @@ void modbus_cmd() {
 
         case MCMD_R_MotorOperation: {
           read_int_buf[0] = motor_operation;
-          number_TX_bytes0 = mcmd_read_int(1, slave_addr);
+          number_TX_bytes0 = mcmd_read_int(1, slave_addr_l);
           break;
         }
         
@@ -679,7 +700,7 @@ void modbus_cmd() {
   
         case MCMD_R_Voltage_hall: {
           read_int_buf[0] = voltage_select;
-          number_TX_bytes0 = mcmd_read_int(1, slave_addr);
+          number_TX_bytes0 = mcmd_read_int(1, slave_addr_l);
           break;				
         }
 
@@ -702,7 +723,7 @@ void modbus_cmd() {
         case MCMD_R_Hall_cntDown: {
           read_int_buf[0] = bldc_GetInvertHall(0) ;
           read_int_buf[0] |= bldc_GetInvertHall(1) * 2;
-          number_TX_bytes0 = mcmd_read_int(1, slave_addr);
+          number_TX_bytes0 = mcmd_read_int(1, slave_addr_l);
           break;
         }
         
@@ -717,7 +738,7 @@ void modbus_cmd() {
         case MCMD_R_Invert_motor: {
           read_int_buf[0] = bldc_GetInvert(0);
           read_int_buf[0] |= bldc_GetInvert(1) * 2;
-          number_TX_bytes0 = mcmd_read_int(1, slave_addr);
+          number_TX_bytes0 = mcmd_read_int(1, slave_addr_l);
           break;
         }
         
@@ -734,7 +755,7 @@ void modbus_cmd() {
           read_int_buf[0] |= (ES_1_normallyOpenLo << 1);
           read_int_buf[0] |= (ES_0_normallyOpenHi << 2);
           read_int_buf[0] |= (ES_1_normallyOpenHi << 3);
-          number_TX_bytes0 = mcmd_read_int(1, slave_addr);
+          number_TX_bytes0 = mcmd_read_int(1, slave_addr_l);
           break;
         }
 
@@ -818,7 +839,7 @@ void modbus_cmd() {
           }
           break;
         }
-#if BLDC_MOTOR_COUNT == 2                
+#if BLDC_MOTOR_COUNT > 1
         case MCMD_R_EndSwithDetectB: {
           Ftemp = bldc_Motor(1)->end_switchDetect;								
           number_TX_bytes0 = mcmd_read_float(Ftemp, (char *)UARTBuffer0);
@@ -929,7 +950,7 @@ void modbus_cmd() {
           }
           break;
         }	
-#if BLDC_MOTOR_COUNT == 2
+#if BLDC_MOTOR_COUNT > 1
         // REST POSITION B
         case MCMD_R_modbus_timeout_position_B: {			
           number_TX_bytes0 = mcmd_read_float(bldc_Motor(1)->modbus_timeout_position, (char *)UARTBuffer0);
@@ -947,7 +968,7 @@ void modbus_cmd() {
         // MODBUS TIMEOUT
         case MCMD_R_modbus_timeout: {			
           read_int_buf[0] = modbus_timeout;
-          number_TX_bytes0 = mcmd_read_int(1, slave_addr);
+          number_TX_bytes0 = mcmd_read_int(1, slave_addr_l);
           break;
         }
         
@@ -963,7 +984,7 @@ void modbus_cmd() {
         // MODBUS TIMEOUT DELAY
         case MCMD_R_modbus_timeout_delay: {
           read_int_buf[0] = modbus_timeout_delay;
-          number_TX_bytes0 = mcmd_read_int(1, slave_addr);
+          number_TX_bytes0 = mcmd_read_int(1, slave_addr_l);
           break;
         }
         
@@ -979,7 +1000,7 @@ void modbus_cmd() {
         //TOO LONG REFERENCE
         case MCMD_R_ref_toolong: {			
           read_int_buf[0] = bldc_config()->homing_timeout;
-          number_TX_bytes0 = mcmd_read_int(1, slave_addr);
+          number_TX_bytes0 = mcmd_read_int(1, slave_addr_l);
           break;
         }
         case MCMD_W_ref_toolong: {
@@ -1045,7 +1066,7 @@ void modbus_cmd() {
           number_TX_bytes0 = mcmd_read_float(bldc_Motor(0)->Idetection, (char *)UARTBuffer0);
           break;				
         }
-#if BLDC_MOTOR_COUNT == 2
+#if BLDC_MOTOR_COUNT > 1
         // GEAR RATIO B
         case MCMD_R_gear_ratio_B: {
           number_TX_bytes0 = mcmd_read_float(bldc_Motor(1)->gear_ratio, (char *)UARTBuffer0);
@@ -1105,7 +1126,7 @@ void modbus_cmd() {
         case MCMD_R_All_PARAM: {
 
           float temp;					
-          bldc_motor *mot= bldc_Motor(0);
+          bldc_motor *mot= bldc_Motor(motor_A);
 
           temp=(float)swVersion.sw_version;
           temp/=1000.0;				//verzija je napisana v int 	
@@ -1118,30 +1139,36 @@ void modbus_cmd() {
           //read_int_buf[6]=0;
 
           read_int_buf[7]=FloatToUIntBytes(GetAnalogValues(SUPPLY));
-          read_int_buf[8]=FloatToUIntBytes(GetAnalogValues(MotorSelectI(bldc_cm->index)));
+          uint8_t I_port = bldc_cm->index;
+          if(BLDC_MOTOR_COUNT > 2  && slave_addr != slave_addr_l){
+        	  I_port = 1;
+          }else if(BLDC_MOTOR_COUNT > 2  && slave_addr == slave_addr_l){
+        	  I_port = 0;
+          }
+          read_int_buf[8]=FloatToUIntBytes(GetAnalogValues(MotorSelectI(I_port)));
 
-          read_int_buf[9]=FloatToUIntBytes (bldc_remaining(0));
-          read_int_buf[10]=FloatToUIntBytes(bldc_position(0));
-          read_int_buf[11]=FloatToUIntBytes(bldc_target(0));
+          read_int_buf[9]=FloatToUIntBytes (bldc_remaining(motor_A));
+          read_int_buf[10]=FloatToUIntBytes(bldc_position(motor_A));
+          read_int_buf[11]=FloatToUIntBytes(bldc_target(motor_A));
           read_int_buf[12]=FloatToUIntBytes(mot->I_limit);
-          read_int_buf[13] = bldc_remainingImp(0);
-          read_int_buf[14] = bldc_positionImp(0);
-          read_int_buf[15] = bldc_targetImp(0);
+          read_int_buf[13] = bldc_remainingImp(motor_A);
+          read_int_buf[14] = bldc_positionImp(motor_A);
+          read_int_buf[15] = bldc_targetImp(motor_A);
           //read_int_buf[16]=0;
-#if BLDC_MOTOR_COUNT == 2
-          bldc_motor *motB= bldc_Motor(1);
+#if BLDC_MOTOR_COUNT > 1
+          bldc_motor *motB= bldc_Motor(motor_B);
 
-          read_int_buf[17] = FloatToUIntBytes (bldc_remaining(1));
-          read_int_buf[18] = FloatToUIntBytes(bldc_position(1));
-          read_int_buf[19] = FloatToUIntBytes(bldc_target(1));
+          read_int_buf[17] = FloatToUIntBytes (bldc_remaining(motor_B));
+          read_int_buf[18] = FloatToUIntBytes(bldc_position(motor_B));
+          read_int_buf[19] = FloatToUIntBytes(bldc_target(motor_B));
           read_int_buf[20] = FloatToUIntBytes(motB->I_limit);
           read_int_buf[21] = tracker_exstatus;
-          read_int_buf[22] = bldc_remainingImp(1);
-          read_int_buf[23] = bldc_positionImp(1);
-          read_int_buf[24] = bldc_targetImp(1);
+          read_int_buf[22] = bldc_remainingImp(motor_B);
+          read_int_buf[23] = bldc_positionImp(motor_B);
+          read_int_buf[24] = bldc_targetImp(motor_B);
 #endif
           // read_int_buf[25]=0;
-          number_TX_bytes0 = mcmd_read_int(26, slave_addr);
+          number_TX_bytes0 = mcmd_read_int(26, slave_addr_l);
           break;
         }	
 				
@@ -1166,7 +1193,7 @@ void modbus_cmd() {
         }
         case MCMD_R_FlashWritCnt: {
           read_int_buf[0] = FlashWriteCounter;
-          number_TX_bytes0 = mcmd_read_int(1, slave_addr);
+          number_TX_bytes0 = mcmd_read_int(1, slave_addr_l);
           break;
         }	
         
@@ -1278,7 +1305,7 @@ void modbus_cmd() {
        // while(1);    			//cakaj na wdt reset 
       }
   }
-  else if(transceiver == XBEE && UARTBuffer0[0] != slave_addr) {
+  else if(transceiver == XBEE && UARTBuffer0[0] != slave_addr && !(UARTBuffer0[0] == slave_addr+1 && BLDC_MOTOR_COUNT > 2)) {
     UARTSend( (uint8_t *)UARTBuffer0, UARTCount0);
     UARTCount1 = 0;
   }
@@ -2053,7 +2080,7 @@ unsigned int mcmd_write_int(unsigned int dn_limit,unsigned int up_limit) {	  //e
 
 void ack_reply() {
 
-  UARTBuffer0[0] = slave_addr; 
+  UARTBuffer0[0] = slave_addr_l;
   UARTBuffer0[1] &=~ (1 << 7);
   UARTBuffer0[2] = MACK_OK;
   number_TX_bytes0 = 3;
@@ -2124,7 +2151,7 @@ void ack_val_reply(float fVal) {
   abc[0]=fVal;
   temp=*p;
 
-  UARTBuffer0[0] = slave_addr; 
+  UARTBuffer0[0] = slave_addr_l;
   UARTBuffer0[1] &=~ (1<<7);
   UARTBuffer0[2] = MACK_OK;
 
@@ -2138,7 +2165,7 @@ void ack_val_reply(float fVal) {
 
 void ack_valUI_reply(unsigned int num_int) {
 
-  UARTBuffer0[0] = slave_addr; 
+  UARTBuffer0[0] = slave_addr_l;
   UARTBuffer0[1] &=~ (1<<7);
   UARTBuffer0[2] = MACK_OK;
 
@@ -2152,7 +2179,7 @@ void ack_valUI_reply(unsigned int num_int) {
 
 void err_reply() {
 
-  UARTBuffer0[0] = slave_addr; 
+  UARTBuffer0[0] = slave_addr_l;
   UARTBuffer0[1] |=(1<<7);
   UARTBuffer0[2] = m_ack_state;
   number_TX_bytes0=3;
@@ -2262,7 +2289,7 @@ unsigned short getVersion() {
 ************************************************************/
 void modbus_timeout_handling(unsigned int *modbus_cnt) {
   if ((slave_addr >= MIN_SLAVE_ADDR) || (slave_addr <= MAX_SLAVE_ADDR)) {
-    unsigned long long mtimeout = (modbus_timeout * 1000) + (modbus_timeout_delay * 1000 * (slave_addr - 1));
+    unsigned long long mtimeout = (modbus_timeout * 1000) + (modbus_timeout_delay * 1000 * (slave_addr_l - 1));
     if(mtimeout > 0xffffffff)
       mtimeout = 0xffffffff;                    //limit value
   
