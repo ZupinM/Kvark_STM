@@ -37,6 +37,8 @@ extern unsigned char enabled_in_micro;
 extern unsigned int sigma_just_connected;
 extern float           LineResistance;
 extern unsigned int hall_enable;
+unsigned int* tracker_status_p[2] = {&tracker_status, &tracker_status2};
+unsigned int* tracker_exstatus_p[2] = {&tracker_exstatus, &tracker_exstatus2};
 
 extern uint8_t usb_drive;
 extern uint8_t voltage_select;
@@ -176,7 +178,7 @@ void modbus_cmd() {
 
   if ((UARTCount0 > 0) && (
    (UARTBuffer0[0] == slave_addr) ||
-   (UARTBuffer0[0] == slave_addr+1 && BLDC_MOTOR_COUNT > 2) ||
+   (UARTBuffer0[0] == slave_addr+1 && motor_count > 2) ||
    (UARTBuffer0[0] == LoRa_id && transceiver == LORA) ||
    (broadcastID == BROADCAST_CALL) ||
    (UARTBuffer0[0] != slave_addr && transceiver == XBEE && ((UARTBuffer0[1] == CMD_RUN_GET_VOLTAGE || UARTBuffer0[1] == CMD_RUN_GET_LOADER_VER ||
@@ -210,13 +212,15 @@ void modbus_cmd() {
       slave_addr_l = slave_addr;
       uint8_t motor_A = 0;
       uint8_t motor_B = 1;
-      if(BLDC_MOTOR_COUNT > 2){
+      uint8_t motor_tracker_id = 0;
+      if(motor_count > 2){
     	  motor_A = 0;							//Motor Port 1 selected
     	  motor_B = 2;
 		  if(UARTBuffer0[0] == slave_addr+1){
 			  slave_addr_l++;
 			  motor_A = 1;						//Motor Port 2 selected
 			  motor_B = 3;
+			  motor_tracker_id = 1;
 			  //Check2ndPortParameters();
 		  }
       }
@@ -233,15 +237,15 @@ void modbus_cmd() {
         // R STATUS
         case MCMD_R_status: {
 
-          read_int_buf[0] = tracker_status;
-          read_int_buf[1] = tracker_exstatus;
+          read_int_buf[0] = *tracker_status_p[motor_tracker_id];
+          read_int_buf[1] = *tracker_exstatus_p[motor_tracker_id];
           number_TX_bytes0 = mcmd_read_int(2, slave_addr_l);
           break;
         }
         // Clear STATUS
         case MCMD_W_status: {
           // A axis					 	
-          ClearStatus();
+          ClearStatus(motor_tracker_id);
           RMeasure_Stop();
           ack_reply();
           backup_timeout = 200;           // 4 sekundi zatem backup v flash
@@ -303,9 +307,9 @@ void modbus_cmd() {
         // IMOTOR
         case MCMD_R_Imotor: {
           uint8_t I_port = bldc_cm->index;
-          if(BLDC_MOTOR_COUNT > 2  && slave_addr != slave_addr_l){
+          if(motor_count > 2  && slave_addr != slave_addr_l){
         	  I_port = 1;
-          }else if(BLDC_MOTOR_COUNT > 2  && slave_addr == slave_addr_l){
+          }else if(motor_count > 2  && slave_addr == slave_addr_l){
         	  I_port = 0;
           }
           number_TX_bytes0 = mcmd_read_float(GetAnalogValues(MotorSelectI(I_port)), (char *)UARTBuffer0);
@@ -372,7 +376,7 @@ void modbus_cmd() {
           read_int_buf[0] = events;
           events = 0;
           number_TX_bytes0 = mcmd_read_int(1, slave_addr_l);
-          tracker_exstatus &= ~EFS_EVENTS_ACTIVE;
+          *tracker_exstatus_p[motor_tracker_id] &= ~EFS_EVENTS_ACTIVE;
           events = 0;
           break;
         }
@@ -592,10 +596,10 @@ void modbus_cmd() {
 
           if(sigma_just_connected < 100000){             //
             if(mode == MODE_MICRO){
-              tracker_status |= SF_TRACKING_ENABLED;
+              *tracker_status_p[motor_tracker_id] |= SF_TRACKING_ENABLED;
               mode = MODE_SLAVE_TRACKING;
             }else if (mode==MODE_OK){
-              tracker_status &= ~SF_TRACKING_ENABLED;
+              *tracker_status_p[motor_tracker_id] &= ~SF_TRACKING_ENABLED;
               mode = MODE_SLAVE;
             }
             sigma_just_connected = 100000;
@@ -611,10 +615,10 @@ void modbus_cmd() {
           if(Utemp & (1<<19)){
             missed_enable = 0;
             if(enabled < 5){
-              tracker_status |= SF_TRACKING_ENABLED;
+              *tracker_status_p[motor_tracker_id] |= SF_TRACKING_ENABLED;
               mode = MODE_SLAVE_TRACKING;
             }else if(enabled >= 5){
-              tracker_status &= SF_TRACKING_ENABLED;
+              *tracker_status_p[motor_tracker_id] &= SF_TRACKING_ENABLED;
               mode = MODE_SLAVE;
             }
           } 
@@ -623,7 +627,7 @@ void modbus_cmd() {
               missed_enable++;
               if(missed_enable > 10){
                 mode = MODE_SLAVE_TRACKING;
-                tracker_status |= SF_TRACKING_ENABLED;
+                *tracker_status_p[motor_tracker_id] |= SF_TRACKING_ENABLED;
                 missed_enable = 0;
               }
             }
@@ -634,7 +638,7 @@ void modbus_cmd() {
                 enable_tracking_retry++;
               if(missed_enable > 3){
                 mode = MODE_SLAVE;
-                tracker_status &= ~SF_TRACKING_ENABLED;
+                *tracker_status_p[motor_tracker_id] &= ~SF_TRACKING_ENABLED;
                 missed_enable = 0;       
               }
             }
@@ -643,7 +647,7 @@ void modbus_cmd() {
           if (enable_tracking_retry > 6){
             enable_tracking_retry = 0;
             mode = MODE_SLAVE_TRACKING;
-            tracker_status |= SF_TRACKING_ENABLED;
+            *tracker_status_p[motor_tracker_id] |= SF_TRACKING_ENABLED;
           }    
           //if (enable_tracking_retry > 3){
            // enable_tracking_retry = 0;
@@ -1131,8 +1135,8 @@ void modbus_cmd() {
           temp=(float)swVersion.sw_version;
           temp/=1000.0;				//verzija je napisana v int 	
           read_int_buf[0] = FloatToUIntBytes(temp);//FloatToUIntBytes(temp);
-          read_int_buf[1] = tracker_status;
-          read_int_buf[2] = tracker_exstatus;
+          read_int_buf[1] = *tracker_status_p[motor_tracker_id];
+          read_int_buf[2] = *tracker_exstatus_p[motor_tracker_id];
           read_int_buf[3] = BOOT_DEVTYPE;
           read_int_buf[4] = BOOT_VERSION;
           read_int_buf[5] = crc_errors;
@@ -1140,9 +1144,9 @@ void modbus_cmd() {
 
           read_int_buf[7]=FloatToUIntBytes(GetAnalogValues(SUPPLY));
           uint8_t I_port = bldc_cm->index;
-          if(BLDC_MOTOR_COUNT > 2  && slave_addr != slave_addr_l){
+          if(motor_count > 2  && slave_addr != slave_addr_l){
         	  I_port = 1;
-          }else if(BLDC_MOTOR_COUNT > 2  && slave_addr == slave_addr_l){
+          }else if(motor_count > 2  && slave_addr == slave_addr_l){
         	  I_port = 0;
           }
           read_int_buf[8]=FloatToUIntBytes(GetAnalogValues(MotorSelectI(I_port)));
@@ -1162,7 +1166,7 @@ void modbus_cmd() {
           read_int_buf[18] = FloatToUIntBytes(bldc_position(motor_B));
           read_int_buf[19] = FloatToUIntBytes(bldc_target(motor_B));
           read_int_buf[20] = FloatToUIntBytes(motB->I_limit);
-          read_int_buf[21] = tracker_exstatus;
+          read_int_buf[21] = *tracker_exstatus_p[motor_tracker_id];
           read_int_buf[22] = bldc_remainingImp(motor_B);
           read_int_buf[23] = bldc_positionImp(motor_B);
           read_int_buf[24] = bldc_targetImp(motor_B);
@@ -1305,7 +1309,7 @@ void modbus_cmd() {
        // while(1);    			//cakaj na wdt reset 
       }
   }
-  else if(transceiver == XBEE && UARTBuffer0[0] != slave_addr && !(UARTBuffer0[0] == slave_addr+1 && BLDC_MOTOR_COUNT > 2)) {
+  else if(transceiver == XBEE && UARTBuffer0[0] != slave_addr && !(UARTBuffer0[0] == slave_addr+1 && motor_count > 2)) {
     UARTSend( (uint8_t *)UARTBuffer0, UARTCount0);
     UARTCount1 = 0;
   }
@@ -2283,31 +2287,6 @@ unsigned short getVersion() {
 
   return swVersion.sw_version;
 }
-
-/***********************************************************
-  REST POSITION
-************************************************************/
-void modbus_timeout_handling(unsigned int *modbus_cnt) {
-  if ((slave_addr >= MIN_SLAVE_ADDR) || (slave_addr <= MAX_SLAVE_ADDR)) {
-    unsigned long long mtimeout = (modbus_timeout * 1000) + (modbus_timeout_delay * 1000 * (slave_addr_l - 1));
-    if(mtimeout > 0xffffffff)
-      mtimeout = 0xffffffff;                    //limit value
-  
-    if (modbus_timeout) {                       //timeout enabled   
-      if (*modbus_cnt >= mtimeout) {   //sekunde
-        flags |= Modbus_timeout;
-      }else{
-        (*modbus_cnt)++;
-        flags &= ~Modbus_timeout;
-      }
-    }else{
-      *modbus_cnt = 0;
-      flags &= ~Modbus_timeout;
-    }
-  }else
-    flags &= ~Modbus_timeout;
-}
-/////////////////////////////////////////////////////////////
 
 
 uint8_t check_slaves(long long slaves, int timeout){

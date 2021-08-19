@@ -92,7 +92,7 @@ void Error_Handler(void);
 /* USER CODE BEGIN EFP */
 void ActivateEvent(unsigned int ev);
 void SetEventParameters(unsigned char motor);
-void ClearStatus();
+void ClearStatus(uint8_t motor_id);
 int realMain(char* reserve);
 void HallVoltage(void);
 void update_flash_backup();

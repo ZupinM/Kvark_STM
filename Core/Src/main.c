@@ -49,6 +49,8 @@
 #include "RTT/SEGGER_RTT.h"
 #include "position.h"
 
+//#define PRODUCTION_RELEASE
+
 #define DAY_MS 	 86400000
 #define HOUR_MS (DAY_MS/24)
 #define MIN_MS	(HOUR_MS/60)
@@ -111,7 +113,9 @@ float err_voltageB;
 extern float bldc_pwm;
 
 unsigned int tracker_status;			//status kondicije, v kateri je tracker (napake, halli...)
+unsigned int tracker_status2;			//Status for motors 1 & 3 when motor_count > 3
 unsigned int tracker_exstatus;
+unsigned int tracker_exstatus2;
 uint8_t slave_addr;			//slave address on RS485
 
 unsigned int SN[4];	   			//vsebujejo serijske stevilke
@@ -399,6 +403,19 @@ int main(void)
   MX_TIM6_Init();
   /* USER CODE BEGIN 2 */
 
+#ifdef PRODUCTION_RELEASE 					//Code Read Protection
+  FLASH_OBProgramInitTypeDef CRP_settings;
+  HAL_FLASH_Unlock();
+  HAL_FLASH_OB_Unlock();
+  HAL_FLASHEx_OBGetConfig(&CRP_settings);
+  if(CRP_settings.RDPLevel == OB_RDP_LEVEL_0){
+	  CRP_settings.RDPLevel = OB_RDP_LEVEL_1;
+	  __HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_OPTVERR);
+	  HAL_FLASHEx_OBProgram(&CRP_settings);
+	  HAL_FLASH_OB_Launch();
+  }
+#endif
+
   int LoadDefaults = 0;
   int startup = 50;
 
@@ -571,22 +588,12 @@ int main(void)
 
 	     weather_sensor();
 
-	     if(GetMode() == MICRO_MODE_SLAVE) {
-	       if(modbus_timeout)
-	         modbus_timeout_handling(&modbus_cnt1);
-	     } else {
-	       modbus_cnt = 0;
-	       flags&=~(1<<Modbus_timeout);
-	     }
-
 	     focus_process();
 
 	     //if(!(bldc_cm->state & BLDC_MOTOR_STATE_DC_OPERATION))
 	       bldc_process();
 	     //else
 	       //dc_process(); // brush mode motor
-
-	     tracker_status_check();
 
 	     led_handling();
 
@@ -605,7 +612,7 @@ int main(void)
 	    	huart1.gState != HAL_UART_STATE_BUSY && huart1.RxState != HAL_UART_STATE_BUSY_RX && //UART is IDLE
 	       (uartMode == UART_MODE_RS485 || uartMode == UART_MODE_XBEE))))
 	     {
-	       if((UARTBuffer0[0] == LoRa_id || UARTBuffer0[0] == slave_addr || UARTBuffer0[0] == 0 || ((UARTBuffer0[0] == slave_addr+1) && (BLDC_MOTOR_COUNT > 2)))
+	       if((UARTBuffer0[0] == LoRa_id || UARTBuffer0[0] == slave_addr || UARTBuffer0[0] == 0 || ((UARTBuffer0[0] == slave_addr+1) && (motor_count > 2)))
 	           && uartMode == UART_MODE_RS485 ){
 	         modbus_cmd();              // 485 received from Sigma, Answer KVARK data, 485->Sigma
 	         modbus_ReqProcessed();      // re-enable reception
@@ -658,7 +665,7 @@ int main(void)
 
 	       if(checkRouting && !rs485_forward_enabled)
 	         check_routing();
-	       if(module.packetReady && (module.rxBuffer[0] == LoRa_id || module.rxBuffer[0] == slave_addr || module.rxBuffer[0] == 0 || ((module.rxBuffer[0] == slave_addr+1) && (BLDC_MOTOR_COUNT > 2)))){
+	       if(module.packetReady && (module.rxBuffer[0] == LoRa_id || module.rxBuffer[0] == slave_addr || module.rxBuffer[0] == 0 || ((module.rxBuffer[0] == slave_addr+1) && (motor_count > 2)))){
 	         modbus_cmd ();         //LoRa receive, KVARK response
 	         modbus_ReqProcessed(); //re-enable reception
 	       }
@@ -712,9 +719,6 @@ int main(void)
 
 	     //Measure_Line_Resistance();
 
-	     // modbus comunication lost
-	     modbus_timeout_handling(&modbus_cnt2);
-
 	     StatusUpdate();
 	     // auto clear status flags
 	     AutoClearFlag();
@@ -728,7 +732,8 @@ int main(void)
 	     if(start_count < CLEAR_TIME)
 	       start_count++;
 	     if(start_count == CLEAR_TIME) {         // clear status
-	       ClearStatus();
+	       ClearStatus(0);
+	       ClearStatus(2);
 	       start_count = CLEAR_TIME + 1;         // stop counter
 	     }
 
@@ -973,103 +978,292 @@ void StatusUpdate() {
   int bldcs = bldc_Status();
   bldc_motor *ma = bldc_Motor(0);
   bldc_motor *mb = bldc_Motor(1);
-  bldc_motor *m2 = bldc_Motor(2);
-  bldc_motor *m3 = bldc_Motor(3);
 
-  tracker_status &= ~(0xff| SF_MOVING_OUT_A | SF_MOVING_IN_A | SF_MOVING_REF_CLR_A | SF_ENDSW_A_LO_PRESSED | SF_ENDSW_A_HI_PRESSED | SF_MOVING_OUT_B | SF_MOVING_IN_B | SF_MOVING_REF_CLR_B | SF_ENDSW_B_LO_PRESSED | SF_ENDSW_B_HI_PRESSED);
+  unsigned int *tracker_status_p = &tracker_status;
+  unsigned int *tracker_exstatus_p = &tracker_exstatus;
 
-  tracker_exstatus &= ~(EFS_VOLTAGE_TO_LOW | EFS_MOTOR_CUTOFF);
-
-  tracker_status |= (ma->status >> 7) & 0xf;    //error flags
-  if (ma->status & BLDC_STATUS_MOVING_OUT)
-    tracker_status |= SF_MOVING_OUT_A;
-  if (ma->status & BLDC_STATUS_MOVING_IN)
-    tracker_status |= SF_MOVING_IN_A;
-  if (ma->status & BLDC_STATUS_HOMING)
-    tracker_status |= SF_MOVING_REF_CLR_A;
-  if (ma->status & BLDC_STATUS_ENDSWITCH_LOW_ACTIVE)
-    tracker_status |= SF_ENDSW_A_LO_PRESSED;
-  if (ma->status & BLDC_STATUS_ENDSWITCH_HIGH_ACTIVE)
-    tracker_status |= SF_ENDSW_A_HI_PRESSED;
-
-  if (ma->status & BLDC_STATUS_ERR_MOVEOUT)
-    tracker_exstatus |= ESF_MOVE_OUT_ERR_A;
-  else
-    tracker_exstatus &=~ ESF_MOVE_OUT_ERR_A;
-
-  if(GetAnalogValues(BATTERY) < 2.4)
-    tracker_exstatus |= EFS_BATTERY_LOW;
-  else
-    tracker_exstatus &= ~EFS_BATTERY_LOW;
-
+  uint8_t motor_count_l = 2;
   if(motor_operation & 0x0002){ // MA DC motor operation
-    ma->state |= BLDC_MOTOR_STATE_DC_OPERATION;
-    m2->state |= BLDC_MOTOR_STATE_DC_OPERATION;
+	bldc_motors[0].state |= BLDC_MOTOR_STATE_DC_OPERATION;
+	bldc_motors[2].state |= BLDC_MOTOR_STATE_DC_OPERATION;
+	motor_count_l++;
   }else{
-    ma->state &= ~BLDC_MOTOR_STATE_DC_OPERATION;
-    m2->state &= ~BLDC_MOTOR_STATE_DC_OPERATION;
+	  bldc_motors[0].state &= ~BLDC_MOTOR_STATE_DC_OPERATION;
+	  bldc_motors[2].state &= ~BLDC_MOTOR_STATE_DC_OPERATION;
   }
   if(motor_operation & 0x10000){ // MB DC motor operation
-    mb->state |= BLDC_MOTOR_STATE_DC_OPERATION;
-    m3->state |= BLDC_MOTOR_STATE_DC_OPERATION;
+	  bldc_motors[1].state |= BLDC_MOTOR_STATE_DC_OPERATION;
+	  bldc_motors[3].state |= BLDC_MOTOR_STATE_DC_OPERATION;
+	motor_count_l++;
   }else{
-    mb->state &= ~BLDC_MOTOR_STATE_DC_OPERATION;
-    m3->state &= ~BLDC_MOTOR_STATE_DC_OPERATION;
+	  bldc_motors[1].state &= ~BLDC_MOTOR_STATE_DC_OPERATION;
+	  bldc_motors[3].state &= ~BLDC_MOTOR_STATE_DC_OPERATION;
   }
-  tracker_status |= (mb->status >> 3) & 0xf0; //error flags
-  //if(mb->status & BLDC_STATUS_HALL_FAULT)
-   // tracker_status |= ERR_HALL_B;
-  if(mb->status& BLDC_STATUS_MOVING_OUT)
-    tracker_status |= SF_MOVING_OUT_B;
-  if(mb->status& BLDC_STATUS_MOVING_IN)
-    tracker_status |= SF_MOVING_IN_B;
-  if(mb->status& BLDC_STATUS_HOMING)
-    tracker_status |= SF_MOVING_REF_CLR_B;
-  if(mb->status& BLDC_STATUS_ENDSWITCH_LOW_ACTIVE)
-    tracker_status |=SF_ENDSW_B_LO_PRESSED;
-  if(mb->status& BLDC_STATUS_ENDSWITCH_HIGH_ACTIVE)
-    tracker_status |=SF_ENDSW_B_HI_PRESSED;
+  motor_count = motor_count_l;
 
-  if(mb->status& BLDC_STATUS_ERR_MOVEOUT)
-    tracker_exstatus |= ESF_MOVE_OUT_ERR_B;
-  else
-    tracker_exstatus &=~ ESF_MOVE_OUT_ERR_B;
+  if(motor_count > 2){
+	  mb = bldc_Motor(2);
+  }
+  for (int m = 0 ; m < motor_count ; m += 2){
+	  if(m >= 2){
+		  tracker_status_p = &tracker_status2;
+		  tracker_exstatus_p = &tracker_exstatus2;
+		  ma = bldc_Motor(1);
+		  mb = bldc_Motor(3);
+	  }
+	  *tracker_status_p &= ~(0xff| SF_MOVING_OUT_A | SF_MOVING_IN_A | SF_MOVING_REF_CLR_A | SF_ENDSW_A_LO_PRESSED | SF_ENDSW_A_HI_PRESSED | SF_MOVING_OUT_B | SF_MOVING_IN_B | SF_MOVING_REF_CLR_B | SF_ENDSW_B_LO_PRESSED | SF_ENDSW_B_HI_PRESSED);
 
-  // INDIKACIJE
-  // extended status
-  if (ma->status & BLDC_STATUS_ENDSWITCH_ERROR)
-    tracker_exstatus |= EFS_END_SWA_FAIL;
-  if (bldcs & BLDC_OVERVOLTAGE)
-    tracker_exstatus |= EFS_OVERVOLTAGE;
-  if (bldcs & BLDC_UNDERVOLTAGE)
-    tracker_exstatus |= EFS_UNDERVOLTAGE;
-  if (bldcs & BLDC_MOTOR_CUTOFF)
-    tracker_exstatus |= EFS_MOTOR_CUTOFF;
-  if (bldcs & BLDC_VOLTAGE_TO_LOW)
-    tracker_exstatus |= EFS_VOLTAGE_TO_LOW;
-  if (flags & buttonstuck)
-    tracker_exstatus |= EFS_BUTTON_STUCK;
+	  *tracker_exstatus_p &= ~(EFS_VOLTAGE_TO_LOW | EFS_MOTOR_CUTOFF);
 
-  if (bldcs & BLDC_LOCKED)
-    tracker_exstatus |= EFS_LOCKED;
-  else
-    tracker_exstatus &=~ EFS_LOCKED;
+	  *tracker_status_p |= (ma->status >> 7) & 0xf;    //error flags
+	  if (ma->status & BLDC_STATUS_ENDSWITCH_LOW_ACTIVE)
+		*tracker_status_p |= SF_ENDSW_A_LO_PRESSED;
+	  if (ma->status & BLDC_STATUS_ENDSWITCH_HIGH_ACTIVE)
+		*tracker_status_p |= SF_ENDSW_A_HI_PRESSED;
 
-  if ((flags & Modbus_timeout) && (!(tracker_status & SF_NO_MODBUS))) {
-    tracker_status |= SF_NO_MODBUS;
+	  if (ma->status & BLDC_STATUS_ERR_MOVEOUT)
+		*tracker_exstatus_p |= ESF_MOVE_OUT_ERR_A;
+	  else
+		*tracker_exstatus_p &=~ ESF_MOVE_OUT_ERR_A;
+
+	  if(GetAnalogValues(BATTERY) < 2.4)
+		*tracker_exstatus_p |= EFS_BATTERY_LOW;
+	  else
+		*tracker_exstatus_p &= ~EFS_BATTERY_LOW;
+
+#if DEVICE != PICO
+	  *tracker_status_p |= (mb->status >> 3) & 0xf0; //error flags
+	  //if(mb->status & BLDC_STATUS_HALL_FAULT)
+	   // tracker_status |= ERR_HALL_B;
+	  if(mb->status& BLDC_STATUS_ENDSWITCH_LOW_ACTIVE)
+		*tracker_status_p |=SF_ENDSW_B_LO_PRESSED;
+	  if(mb->status& BLDC_STATUS_ENDSWITCH_HIGH_ACTIVE)
+		*tracker_status_p |=SF_ENDSW_B_HI_PRESSED;
+
+	  if(mb->status& BLDC_STATUS_ERR_MOVEOUT)
+		*tracker_exstatus_p |= ESF_MOVE_OUT_ERR_B;
+	  else
+		*tracker_exstatus_p &=~ ESF_MOVE_OUT_ERR_B;
+#endif
+	  // INDIKACIJE
+	  // extended status
+	  if (ma->status & BLDC_STATUS_ENDSWITCH_ERROR)
+		*tracker_exstatus_p |= EFS_END_SWA_FAIL;
+	  if (bldcs & BLDC_OVERVOLTAGE)
+		*tracker_exstatus_p |= EFS_OVERVOLTAGE;
+	  if (bldcs & BLDC_UNDERVOLTAGE)
+		*tracker_exstatus_p |= EFS_UNDERVOLTAGE;
+	  if (bldcs & BLDC_MOTOR_CUTOFF)
+		*tracker_exstatus_p |= EFS_MOTOR_CUTOFF;
+	  if (bldcs & BLDC_VOLTAGE_TO_LOW)
+		*tracker_exstatus_p |= EFS_VOLTAGE_TO_LOW;
+	  if (flags & buttonstuck)
+		*tracker_exstatus_p |= EFS_BUTTON_STUCK;
+	  else
+		*tracker_exstatus_p &= ~EFS_BUTTON_STUCK;
+
+	  if (bldcs & BLDC_LOCKED)
+		*tracker_exstatus_p |= EFS_LOCKED;
+	  else
+		*tracker_exstatus_p &=~ EFS_LOCKED;
+
+	  if ((flags & Modbus_timeout) && (!(tracker_status & SF_NO_MODBUS))) {
+		*tracker_status_p |= SF_NO_MODBUS;
+	  }
+
+	  /* napaka MOTORJA A */
+	  if ((ma->status & BLDC_STATUS_OVERCURRENT)&&(!(*tracker_status_p & ERR_OVERCURRENT_MOTOR_A))) {
+		  *tracker_status_p |= ERR_OVERCURRENT_MOTOR_A;
+	    backup_timeout=BACKUP_TO;
+	  }
+	  if ((!(ma->status & BLDC_STATUS_OVERCURRENT))&&(*tracker_status_p & ERR_OVERCURRENT_MOTOR_A)) {
+		  *tracker_status_p &=~ ERR_OVERCURRENT_MOTOR_A;
+	    backup_timeout=BACKUP_TO;
+	  }
+
+	  /* napaka MOTORJA B */
+	  if ((mb->status & BLDC_STATUS_OVERCURRENT)&&(!(*tracker_status_p & ERR_OVERCURRENT_MOTOR_B))) {
+		  *tracker_status_p |= ERR_OVERCURRENT_MOTOR_B;
+	    backup_timeout=BACKUP_TO;
+	  }
+	  if ((!(mb->status & BLDC_STATUS_OVERCURRENT))&&(*tracker_status_p & ERR_OVERCURRENT_MOTOR_B)) {
+		  *tracker_status_p &= ~ERR_OVERCURRENT_MOTOR_B;
+	    backup_timeout=BACKUP_TO;
+	  }
+	  /* napaka HALL-a A - sproti se osvezuje */
+	  if ((ma->status& BLDC_STATUS_HALL_FAULT)&&(!(*tracker_status_p &ERR_HALL_A))) {
+		  *tracker_status_p |=ERR_HALL_A;
+	    backup_timeout=BACKUP_TO;
+	  }
+	  if ((!(ma->status& BLDC_STATUS_HALL_FAULT))&&(*tracker_status_p &ERR_HALL_A)) {
+		  *tracker_status_p &=~ERR_HALL_A;
+	    backup_timeout=BACKUP_TO;
+	  }
+
+	  /* HALL-A Loosing impulses - sproti se osvezuje */
+	  if ((ma->status& BLDC_STATUS_HALL_LOST_IMPULSES)&&(!(*tracker_status_p &SF_HALL_WIRING_A))) {
+		  *tracker_status_p |=SF_HALL_WIRING_A;
+	    backup_timeout=BACKUP_TO;
+	  }
+	  if ((!(ma->status& BLDC_STATUS_HALL_LOST_IMPULSES))&&(*tracker_status_p &SF_HALL_WIRING_A)) {
+		  *tracker_status_p &=~SF_HALL_WIRING_A;
+	    backup_timeout=BACKUP_TO;
+	  }
+
+	  /* napaka HALL-a B - sproti se osvezuje */
+	  if ((mb->status& BLDC_STATUS_HALL_FAULT)&&(!(*tracker_status_p&ERR_HALL_B))) {
+		  *tracker_status_p |=ERR_HALL_B;
+	    backup_timeout=BACKUP_TO;
+	  }
+	  if ((!(mb->status& BLDC_STATUS_HALL_FAULT))&&(*tracker_status_p &ERR_HALL_B)) {
+		  *tracker_status_p &=~ERR_HALL_B;
+	    backup_timeout=BACKUP_TO;
+	  }
+
+	  /* HALL-B Loosing impulses - sproti se osvezuje */
+	  if ((mb->status& BLDC_STATUS_HALL_LOST_IMPULSES)&&(!(*tracker_status_p &SF_HALL_WIRING_B))) {
+		  *tracker_status_p |=SF_HALL_WIRING_B;
+	    backup_timeout=BACKUP_TO;
+	  }
+	  if ((!(mb->status& BLDC_STATUS_HALL_LOST_IMPULSES))&&(*tracker_status_p &SF_HALL_WIRING_B)) {
+		  *tracker_status_p &=~SF_HALL_WIRING_B;
+	    backup_timeout=BACKUP_TO;
+	  }
+
+	  /* napaka KABLA A - sproti se osvezuje */
+	  if ((ma->status & BLDC_STATUS_CABLEERROR)&&(!(*tracker_status_p &ERR_CABLE_A))) {
+		  *tracker_status_p |=ERR_CABLE_A;
+	    backup_timeout=BACKUP_TO;
+	  }
+	  if ((!(ma->status & BLDC_STATUS_CABLEERROR))&&(*tracker_status_p &ERR_CABLE_A)) {
+		  *tracker_status_p &=~ERR_CABLE_A;
+	    backup_timeout=BACKUP_TO;
+	  }
+	  /* napaka KABLA B - sproti se osvezuje */
+	  if ((mb->status & BLDC_STATUS_CABLEERROR)&&(!(*tracker_status_p &ERR_CABLE_B))) {
+		  *tracker_status_p |=ERR_CABLE_B;
+	    backup_timeout=BACKUP_TO;
+	  }
+	  if ((!(mb->status & BLDC_STATUS_CABLEERROR))&&(*tracker_status_p &ERR_CABLE_B)) {
+		  *tracker_status_p &=~ERR_CABLE_B;
+	    backup_timeout=BACKUP_TO;
+	  }
+
+	  if ((ma->status & BLDC_STATUS_TO_DST_ERR) && (!(*tracker_status_p & (1 << ERR_TO_DST_A)))) {
+		  *tracker_status_p |= (1 << ERR_TO_DST_A);
+	    backup_timeout=BACKUP_TO;
+	  }
+	  if ((!(ma->status & BLDC_STATUS_TO_DST_ERR)) && (*tracker_status_p & (1 << ERR_TO_DST_A))) {
+		  *tracker_status_p &= ~(1 << ERR_TO_DST_A);
+	    backup_timeout=BACKUP_TO;
+	  }
+	  if ((mb->status & BLDC_STATUS_TO_DST_ERR) && (!(*tracker_status_p & (1 << ERR_TO_DST_B)))) {
+		  *tracker_status_p |= (1 << ERR_TO_DST_B);
+	    backup_timeout=BACKUP_TO;
+	  }
+	  if ((!(mb->status & BLDC_STATUS_TO_DST_ERR)) && (*tracker_status_p & (1 << ERR_TO_DST_B))) {
+		  *tracker_status_p &= ~(1 << ERR_TO_DST_B);
+	    backup_timeout=BACKUP_TO;
+	  }
+
+	  // napaka referenc too long A
+	  if ((ma->status & BLDC_STATUS_HOME_TIMEOUT)&&(!(*tracker_status_p &ERR_TOOLONG_REF_A))) {
+		  *tracker_status_p |=ERR_TOOLONG_REF_A;
+	    backup_timeout=BACKUP_TO;
+	  }
+	  if ((!(ma->status & BLDC_STATUS_HOME_TIMEOUT))&&(*tracker_status_p&ERR_TOOLONG_REF_A)) {
+		  *tracker_status_p &=~ERR_TOOLONG_REF_A;
+	      backup_timeout=BACKUP_TO;
+	  }
+
+	  // napaka referenc too long B
+	  if ((mb->status & BLDC_STATUS_HOME_TIMEOUT)&&(!(*tracker_status_p &ERR_TOOLONG_REF_B))) {
+		  *tracker_status_p |=ERR_TOOLONG_REF_B;
+	    backup_timeout=BACKUP_TO;
+	  }
+	  if ((!(mb->status & BLDC_STATUS_HOME_TIMEOUT))&&(*tracker_status_p &ERR_TOOLONG_REF_B)) {
+		  *tracker_status_p &=~ERR_TOOLONG_REF_B;
+	    backup_timeout=BACKUP_TO;
+	  }
+
+
+	//  INDIKACIJE
+
+	  /* indikacija pritiska TIPKE v statusu */
+	  if (ButtonStatus != 0)
+		  *tracker_status_p |=SF_BUTTON_PRESSED;
+	        else tracker_status&=~SF_BUTTON_PRESSED;
+
+	   /*indikacija VRTENJA motorja A - se osvezuje sproti */
+
+	  if(ma->status & BLDC_STATUS_MOVING_IN) {
+		  *tracker_status_p |= SF_MOVING_IN_A;
+		  *tracker_status_p &= ~SF_MOVING_IN_B;
+		  *tracker_status_p &= ~SF_MOVING_OUT_B;
+	  }
+	  else {
+	    tracker_status &= ~SF_MOVING_IN_A;
+	  }
+	  if(ma->status & BLDC_STATUS_MOVING_OUT) {
+		  *tracker_status_p |= SF_MOVING_OUT_A;
+		  *tracker_status_p &= ~SF_MOVING_IN_B;
+		  *tracker_status_p &= ~SF_MOVING_OUT_B;
+	  }
+	  else {
+		  *tracker_status_p &= ~SF_MOVING_OUT_A;
+	  }
+
+	  /* indikacija VRTENJA motorja B - se osvezuje sproti */
+	  if(mb->status & BLDC_STATUS_MOVING_IN) {
+		  *tracker_status_p |= SF_MOVING_IN_B;
+		  *tracker_status_p &= ~SF_MOVING_IN_A;
+		  *tracker_status_p &= ~SF_MOVING_OUT_A;
+	  }
+	  else {
+		  *tracker_status_p &= ~SF_MOVING_IN_B;
+	  }
+
+	  if(mb->status & BLDC_STATUS_MOVING_OUT) {
+		  *tracker_status_p |= SF_MOVING_OUT_B;
+		  *tracker_status_p &= ~SF_MOVING_IN_A;
+		  *tracker_status_p &= ~SF_MOVING_OUT_A;
+	  }
+	  else {
+		  *tracker_status_p &= ~SF_MOVING_OUT_B;
+	  }
+
+	  /* indikacija REFERENCE A - se osvezuje sproti */
+	  if (ma->status & BLDC_STATUS_HOMING)
+		  *tracker_status_p |=SF_MOVING_REF_CLR_A;
+	  else *tracker_status_p &=~SF_MOVING_REF_CLR_A;
+
+	  /* indikacija REFERENCE B - se osvezuje sproti */
+	  if  (mb->status & BLDC_STATUS_HOMING)
+		  *tracker_status_p |=SF_MOVING_REF_CLR_B;
+	  else *tracker_status_p &=~SF_MOVING_REF_CLR_B;
   }
 
-  if(tracker_exstatus_prev != tracker_exstatus && (tracker_exstatus & EFS_UNDERVOLTAGE) == EFS_UNDERVOLTAGE)
+  /*if(tracker_exstatus_prev != tracker_exstatus && (tracker_exstatus & EFS_UNDERVOLTAGE) == EFS_UNDERVOLTAGE)
     flash_write(FLASH_ADDR_MAIN);
 
-  tracker_exstatus_prev = tracker_exstatus;
+  tracker_exstatus_prev = tracker_exstatus;*/ //TODO
 }
 
-void ClearStatus() {
+void ClearStatus(uint8_t motor_id) {
+
+  unsigned int *tracker_status_p;
+  unsigned int *tracker_exstatus_p;
+  if(motor_id == 0){
+	  tracker_status_p = &tracker_status;
+	  tracker_exstatus_p = &tracker_exstatus;
+  }
+  else{
+	  tracker_status_p = &tracker_status2;
+	  tracker_exstatus_p = &tracker_exstatus2;
+  }
   crc_errors       = 0;
-  tracker_status = 0;
-  tracker_status &= ~(0xff | SF_HALL_WIRING_A | SF_HALL_WIRING_B | SYS_PARAM_FLASH_ERR | SF_POWER_FAILURE | SF_MOVING_OUT_A | SF_MOVING_IN_A | SF_MOVING_REF_CLR_A | SF_ENDSW_A_LO_PRESSED | SF_ENDSW_A_HI_PRESSED | SF_MOVING_OUT_B | SF_MOVING_IN_B | SF_MOVING_REF_CLR_B | SF_ENDSW_B_LO_PRESSED | SF_ENDSW_B_HI_PRESSED | SF_NO_MODBUS);			//brisi zastavice
-  tracker_exstatus &= ~EFS_ERROR_CLEAR;
+  *tracker_status_p &= ~(0xff | SF_HALL_WIRING_A | SF_HALL_WIRING_B | SYS_PARAM_FLASH_ERR | SF_POWER_FAILURE | SF_MOVING_OUT_A | SF_MOVING_IN_A | SF_MOVING_REF_CLR_A | SF_ENDSW_A_LO_PRESSED | SF_ENDSW_A_HI_PRESSED | SF_MOVING_OUT_B | SF_MOVING_IN_B | SF_MOVING_REF_CLR_B | SF_ENDSW_B_LO_PRESSED | SF_ENDSW_B_HI_PRESSED | SF_NO_MODBUS);			//brisi zastavice
+  *tracker_exstatus_p &= ~EFS_ERROR_CLEAR;
   bldc_ClearStatus();
   //void ClearStatus (void) {
   //
@@ -1136,7 +1330,7 @@ void ButtonProcess () {
   if (ButtonStatus && !(flags&buttonstuck)) {   // at least one button pressed
     if (button_timeout++ > (600*1000)) {        // 10 min timeout
       flags |= buttonstuck;
-      button_timeout = 0;
+      button_timeout = 5000;
     }
   }
 
@@ -1156,13 +1350,11 @@ void ButtonProcess () {
       bldc_Stop(1);
 
     //button stuck release
-    if (flags & buttonstuck) {
-      button_timeout++;
-      if (button_timeout >= (1 * 5000)) {
+    if (flags & buttonstuck && button_timeout) {
+      button_timeout--;
+      if (button_timeout == 0) {
         flags &= ~buttonstuck;
       }
-    } else{
-      button_timeout = 0;           // button not stuck, reset counter
     }
     return;
   }
@@ -1212,7 +1404,8 @@ void ButtonProcess () {
       bldc_manual(1);
 
     } else if (ButtonStatus & (1<<2)) {       // Clear status
-      ClearStatus();
+      ClearStatus(0);
+      ClearStatus(1);
 
     } else if (ButtonStatus & (1<<3)) {       // Home
       bldc_Home(0);
@@ -1343,186 +1536,6 @@ void Measure_Line_Resistance() {
 }
 
 
-/***********************************************************
-  TRACKER STATUS
-************************************************************/
-void tracker_status_check(){
-
-//  ERROR
-  /* napaka MOTORJA A */
-  if ((bldc_motors[0].status & BLDC_STATUS_OVERCURRENT)&&(!(tracker_status & ERR_OVERCURRENT_MOTOR_A))) {
-    tracker_status|= ERR_OVERCURRENT_MOTOR_A;
-    backup_timeout=BACKUP_TO;
-  }
-  if ((!(bldc_motors[0].status & BLDC_STATUS_OVERCURRENT))&&(tracker_status & ERR_OVERCURRENT_MOTOR_A)) {
-    tracker_status&=~ ERR_OVERCURRENT_MOTOR_A;
-    backup_timeout=BACKUP_TO;
-  }
-
-  /* napaka MOTORJA B */
-  if ((bldc_motors[1].status & BLDC_STATUS_OVERCURRENT)&&(!(tracker_status & ERR_OVERCURRENT_MOTOR_B))) {
-    tracker_status|= ERR_OVERCURRENT_MOTOR_B;
-    backup_timeout=BACKUP_TO;
-  }
-  if ((!(bldc_motors[1].status & BLDC_STATUS_OVERCURRENT))&&(tracker_status & ERR_OVERCURRENT_MOTOR_B)) {
-    tracker_status&= ~ERR_OVERCURRENT_MOTOR_B;
-    backup_timeout=BACKUP_TO;
-  }
-  /* napaka HALL-a A - sproti se osvezuje */
-  if ((bldc_motors[0].status& BLDC_STATUS_HALL_FAULT)&&(!(tracker_status&ERR_HALL_A))) {
-    tracker_status|=ERR_HALL_A;
-    backup_timeout=BACKUP_TO;
-  }
-  if ((!(bldc_motors[0].status& BLDC_STATUS_HALL_FAULT))&&(tracker_status&ERR_HALL_A)) {
-    tracker_status&=~ERR_HALL_A;
-    backup_timeout=BACKUP_TO;
-  }
-
-  /* HALL-A Loosing impulses - sproti se osvezuje */
-  if ((bldc_motors[0].status& BLDC_STATUS_HALL_LOST_IMPULSES)&&(!(tracker_status&SF_HALL_WIRING_A))) {
-    tracker_status|=SF_HALL_WIRING_A;
-    backup_timeout=BACKUP_TO;
-  }
-  if ((!(bldc_motors[0].status& BLDC_STATUS_HALL_LOST_IMPULSES))&&(tracker_status&SF_HALL_WIRING_A)) {
-    tracker_status&=~SF_HALL_WIRING_A;
-    backup_timeout=BACKUP_TO;
-  }
-
-  /* napaka HALL-a B - sproti se osvezuje */
-  if ((bldc_motors[1].status& BLDC_STATUS_HALL_FAULT)&&(!(tracker_status&ERR_HALL_B))) {
-    tracker_status|=ERR_HALL_B;
-    backup_timeout=BACKUP_TO;
-  }
-  if ((!(bldc_motors[1].status& BLDC_STATUS_HALL_FAULT))&&(tracker_status&ERR_HALL_B)) {
-    tracker_status&=~ERR_HALL_B;
-    backup_timeout=BACKUP_TO;
-  }
-
-  /* HALL-B Loosing impulses - sproti se osvezuje */
-  if ((bldc_motors[1].status& BLDC_STATUS_HALL_LOST_IMPULSES)&&(!(tracker_status&SF_HALL_WIRING_B))) {
-    tracker_status|=SF_HALL_WIRING_B;
-    backup_timeout=BACKUP_TO;
-  }
-  if ((!(bldc_motors[1].status& BLDC_STATUS_HALL_LOST_IMPULSES))&&(tracker_status&SF_HALL_WIRING_B)) {
-    tracker_status&=~SF_HALL_WIRING_B;
-    backup_timeout=BACKUP_TO;
-  }
-
-  /* napaka KABLA A - sproti se osvezuje */
-  if ((bldc_motors[0].status & BLDC_STATUS_CABLEERROR)&&(!(tracker_status&ERR_CABLE_A))) {
-    tracker_status|=ERR_CABLE_A;
-    backup_timeout=BACKUP_TO;
-  }
-  if ((!(bldc_motors[0].status & BLDC_STATUS_CABLEERROR))&&(tracker_status&ERR_CABLE_A)) {
-    tracker_status&=~ERR_CABLE_A;
-    backup_timeout=BACKUP_TO;
-  }
-  /* napaka KABLA B - sproti se osvezuje */
-  if ((bldc_motors[1].status & BLDC_STATUS_CABLEERROR)&&(!(tracker_status&ERR_CABLE_B))) {
-    tracker_status|=ERR_CABLE_B;
-    backup_timeout=BACKUP_TO;
-  }
-  if ((!(bldc_motors[1].status & BLDC_STATUS_CABLEERROR))&&(tracker_status&ERR_CABLE_B)) {
-    tracker_status&=~ERR_CABLE_B;
-    backup_timeout=BACKUP_TO;
-  }
-
-  if ((bldc_motors[0].status & BLDC_STATUS_TO_DST_ERR) && (!(tracker_status & (1 << ERR_TO_DST_A)))) {
-    tracker_status |= (1 << ERR_TO_DST_A);
-    backup_timeout=BACKUP_TO;
-  }
-  if ((!(bldc_motors[0].status & BLDC_STATUS_TO_DST_ERR)) && (tracker_status & (1 << ERR_TO_DST_A))) {
-    tracker_status &= ~(1 << ERR_TO_DST_A);
-    backup_timeout=BACKUP_TO;
-  }
-  if ((bldc_motors[1].status & BLDC_STATUS_TO_DST_ERR) && (!(tracker_status & (1 << ERR_TO_DST_B)))) {
-    tracker_status |= (1 << ERR_TO_DST_B);
-    backup_timeout=BACKUP_TO;
-  }
-  if ((!(bldc_motors[1].status & BLDC_STATUS_TO_DST_ERR)) && (tracker_status & (1 << ERR_TO_DST_B))) {
-    tracker_status &= ~(1 << ERR_TO_DST_B);
-    backup_timeout=BACKUP_TO;
-  }
-
-  // napaka referenc too long A
-  if ((bldc_motors[0].status & BLDC_STATUS_HOME_TIMEOUT)&&(!(tracker_status&ERR_TOOLONG_REF_A))) {
-    tracker_status|=ERR_TOOLONG_REF_A;
-    backup_timeout=BACKUP_TO;
-  }
-  if ((!(bldc_motors[0].status & BLDC_STATUS_HOME_TIMEOUT))&&(tracker_status&ERR_TOOLONG_REF_A)) {
-      tracker_status&=~ERR_TOOLONG_REF_A;
-      backup_timeout=BACKUP_TO;
-  }
-
-  // napaka referenc too long B
-  if ((bldc_motors[1].status & BLDC_STATUS_HOME_TIMEOUT)&&(!(tracker_status&ERR_TOOLONG_REF_B))) {
-    tracker_status|=ERR_TOOLONG_REF_B;
-    backup_timeout=BACKUP_TO;
-  }
-  if ((!(bldc_motors[1].status & BLDC_STATUS_HOME_TIMEOUT))&&(tracker_status&ERR_TOOLONG_REF_B)) {
-    tracker_status&=~ERR_TOOLONG_REF_B;
-    backup_timeout=BACKUP_TO;
-  }
-
-
-
-
-//  INDIKACIJE
-
-  /* indikacija pritiska TIPKE v statusu */
-  if (ButtonStatus != 0)
-   tracker_status|=SF_BUTTON_PRESSED;
-        else tracker_status&=~SF_BUTTON_PRESSED;
-
-   /*indikacija VRTENJA motorja A - se osvezuje sproti */
-
-  if(bldc_motors[0].status & BLDC_STATUS_MOVING_IN) {
-    tracker_status |= SF_MOVING_IN_A;
-    tracker_status &= ~SF_MOVING_IN_B;
-    tracker_status &= ~SF_MOVING_OUT_B;
-  }
-  else {
-    tracker_status &= ~SF_MOVING_IN_A;
-  }
-  if(bldc_motors[0].status & BLDC_STATUS_MOVING_OUT) {
-    tracker_status |= SF_MOVING_OUT_A;
-    tracker_status &= ~SF_MOVING_IN_B;
-    tracker_status &= ~SF_MOVING_OUT_B;
-  }
-  else {
-    tracker_status &= ~SF_MOVING_OUT_A;
-  }
-
-  /* indikacija VRTENJA motorja B - se osvezuje sproti */
-  if(bldc_motors[1].status & BLDC_STATUS_MOVING_IN) {
-    tracker_status |= SF_MOVING_IN_B;
-    tracker_status &= ~SF_MOVING_IN_A;
-    tracker_status &= ~SF_MOVING_OUT_A;
-  }
-  else {
-    tracker_status &= ~SF_MOVING_IN_B;
-  }
-
-  if(bldc_motors[1].status & BLDC_STATUS_MOVING_OUT) {
-    tracker_status |= SF_MOVING_OUT_B;
-    tracker_status &= ~SF_MOVING_IN_A;
-    tracker_status &= ~SF_MOVING_OUT_A;
-  }
-  else {
-    tracker_status &= ~SF_MOVING_OUT_B;
-  }
-
-  /* indikacija REFERENCE A - se osvezuje sproti */
-  if (bldc_motors[0].status & BLDC_STATUS_HOMING)
-    tracker_status|=SF_MOVING_REF_CLR_A;
-  else tracker_status&=~SF_MOVING_REF_CLR_A;
-
-  /* indikacija REFERENCE B - se osvezuje sproti */
-  if  (bldc_motors[1].status & BLDC_STATUS_HOMING)
-    tracker_status|=SF_MOVING_REF_CLR_B;
-  else tracker_status&=~SF_MOVING_REF_CLR_B;
-
-}
 /* USER CODE END 4 */
 
 /**

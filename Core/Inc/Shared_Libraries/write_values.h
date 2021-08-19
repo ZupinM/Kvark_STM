@@ -7,7 +7,6 @@
 void write_values(unsigned char box, unsigned int IntTemp, float FloatTemp, unsigned char *StringTemp);
 void write_value_limit(void);
 unsigned int  decrypt (unsigned int rotate, unsigned int chiper);
-void ClearStatus (void);
 
 
 //----------------------------------

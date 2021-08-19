@@ -377,14 +377,14 @@ void write_values(unsigned char box, unsigned int IntTemp, float FloatTemp, unsi
                   }
                   /*********************/
                   case '5': {	                                                    //ROCNA REFERENCA A  
-                         ClearStatus();
+                         ClearStatus(0);
                          bldc_manual(0);
                          status_homing = 1;
                          bldc_Home(0);
                        break;
                   }
                   case '6': {                                   //ROCNA REFERENCA B
-                          ClearStatus();
+                          ClearStatus(0);
                           bldc_manual(0);
                           status_homing = 1;
                           bldc_Home(1);
@@ -436,7 +436,7 @@ void write_values(unsigned char box, unsigned int IntTemp, float FloatTemp, unsi
         break;
     }
     case cStatus: {             //DEBUG okno
-            ClearStatus();
+            ClearStatus(0);
             return;
         break;
     }

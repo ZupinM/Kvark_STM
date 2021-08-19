@@ -16,6 +16,9 @@
 #define HALL_ENABLED_BOTH	2
 #define HALL_ENABLED_SINGLE	3
 
+#define FREEWHEEL_SPEED_DEFAULT_DC 85
+#define FREEWHEEL_SPEED_DEFAULT_BLDC 420
+
 extern char motor_break;
 extern unsigned int hall_enable; // bitwise A motor: bits 0, 1; B motor: bits 16, 17.
 

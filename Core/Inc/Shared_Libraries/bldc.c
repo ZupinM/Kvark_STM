@@ -139,6 +139,7 @@ bldc_misc  bldc_cfg;
 bldc_motor bldc_motors[BLDC_MOTOR_COUNT];            //motors
 bldc_motor *bldc_cm = &bldc_motors[0];
 bldc_motor blank_motor;
+uint8_t motor_count = 1;
 
 #define ADC_CONVERT_TICS 120
 
@@ -189,6 +190,7 @@ int bldc_ReadHall(unsigned char motor){
 void bldc_init_motors(int LoadDefaults)
 {
   if(LoadDefaults) {
+	motor_count = 2; //Default: 2 BLDC motors
     for(int i = 0; i < BLDC_MOTOR_COUNT; i++) {
       //init parameters
       bldc_motors[i].state           = 0;
@@ -210,7 +212,7 @@ void bldc_init_motors(int LoadDefaults)
       bldc_motors[i].Idetection      = 0.07;
       bldc_motors[i].end_switchDetect = 10;
 
-      bldc_motors[i].speed_freewheel = ZEROSPEED / 10;
+      bldc_motors[i].speed_freewheel = FREEWHEEL_SPEED_DEFAULT_BLDC;
       bldc_motors[i].speed = ZEROSPEED;
       bldc_motors[i].speed_old = ZEROSPEED;
       bldc_motors[i].ramp = 800;
@@ -794,15 +796,14 @@ void bldc_update_pwm(unsigned short value) {
 
 
 int bldc_HomeSwitchActive(unsigned char motor , unsigned char switch_h_l) {
-
+#if DEVICE != PICO
   if(bldc_cm->state & BLDC_MOTOR_STATE_DC_OPERATION){	// DC Motors --One Low Switch per Port
 	  if(motor == 0 || motor == 2){
-#if DEVICE != PICO
+
 		if(!ES_0_normallyOpenLo && !switch_h_l)
 		  return(!HAL_GPIO_ReadPin(END_SW_A_HI_GPIO_Port, END_SW_A_HI_Pin));
 		else if(ES_0_normallyOpenLo && !switch_h_l)
 			return(HAL_GPIO_ReadPin(END_SW_A_HI_GPIO_Port, END_SW_A_HI_Pin));
-#endif
 	  }
 
 	  if(motor == 1 || motor == 3){
@@ -813,6 +814,7 @@ int bldc_HomeSwitchActive(unsigned char motor , unsigned char switch_h_l) {
 	  }
 	  return 0;
   }
+#endif
 
 
   if (motor == 0){										//BLDC Motors -- Low and High switch for every motor
@@ -1181,14 +1183,14 @@ void bldc_process() {
     bldc_cm->status|= BLDC_STATUS_ENDSWITCH_ERROR;
     //return;
   }
-#if BLDC_MOTOR_COUNT < 3
-  if(bldc_HomeSwitchActive(bldc_cm->index,1) && bldc_cm->ctrl == BLDC_CTRL_TRACKING && bldc_cm->position <  bldc_position_to_pulses(bldc_cm->index, (bldc_cm->max_position -bldc_cm->end_switchDetect - 0.1)) ){
-    SetEventParameters(bldc_cm->index);
-    //ActivateDrivers(0);
-    bldc_cm->status|= BLDC_STATUS_ENDSWITCH_ERROR;
-    //return;
+  if(motor_count < 3){
+	  if(bldc_HomeSwitchActive(bldc_cm->index,1) && bldc_cm->ctrl == BLDC_CTRL_TRACKING && bldc_cm->position <  bldc_position_to_pulses(bldc_cm->index, (bldc_cm->max_position -bldc_cm->end_switchDetect - 0.1)) ){
+		SetEventParameters(bldc_cm->index);
+		//ActivateDrivers(0);
+		bldc_cm->status|= BLDC_STATUS_ENDSWITCH_ERROR;
+		//return;
+	  }
   }
-#endif
   //****end switch detection****
 
   if(bldc_HomeSwitchActive(bldc_cm->index,0) && bldc_cm->ctrl & BLDC_CTRL_HOMING) {
@@ -1208,14 +1210,14 @@ void bldc_process() {
     ActivateDrivers(0);
     return;
   }
-#if BLDC_MOTOR_COUNT < 3
-  if(bldc_HomeSwitchActive(bldc_cm->index,1) && bldc_cm->target > bldc_cm->position){
-    bldc_cm->target = bldc_cm->position;
-    bldc_cm->ctrl = BLDC_CTRL_STOP;
-    ActivateDrivers(0);
-    return;
+  if(motor_count < 3){
+	  if(bldc_HomeSwitchActive(bldc_cm->index,1) && bldc_cm->target > bldc_cm->position){
+		bldc_cm->target = bldc_cm->position;
+		bldc_cm->ctrl = BLDC_CTRL_STOP;
+		ActivateDrivers(0);
+		return;
+	  }
   }
-#endif
 
   //****Invert direction of rotation or hall****
   if(!(bldc_motors[0].status & BLDC_STATUS_MOVING) && (bldc_motors[0].state & BLDC_MOTOR_STATE_INVERT_DIRECTION_REQUEST)){ //After motor A stoped moving
@@ -1328,7 +1330,7 @@ void bldc_Comutate(unsigned char motor){
          commutation_counter++;
     else commutation_counter = 0, hall_detect = 0; 
 
-    if((hall_detect < 6) && (commutation_counter == 6)){ // Detect missing hall pulses
+    if((hall_detect < 6) && (commutation_counter == 6) && !(bldc_motors[motor].state & BLDC_MOTOR_STATE_DC_OPERATION)){ // Detect missing hall pulses
       hall_fault++;
       if (hall_fault > 5){
         bldc_motors[bldc_motors[motor].index].status |= BLDC_STATUS_HALL_FAULT;
@@ -1423,9 +1425,11 @@ void set_external_INT(uint8_t motor, uint8_t state){
 	  GPIO_InitTypeDef GPIO_InitStruct = {0};
 	  if(state == BLDC_SET_INT){
 		  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING_FALLING;
+		  bldc_motors[motor].speed_freewheel = FREEWHEEL_SPEED_DEFAULT_BLDC; // Initialize default Freewheeling speed
 	  }
 	  else{
 		  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+		  bldc_motors[motor].speed_freewheel = FREEWHEEL_SPEED_DEFAULT_DC;
 	  }
 	  GPIO_InitStruct.Pull = GPIO_PULLUP;
 	  if(motor == MOTOR_0){

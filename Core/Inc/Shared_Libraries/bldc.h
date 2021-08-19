@@ -59,6 +59,7 @@ typedef struct{
 
 extern bldc_motor *bldc_cm;
 extern bldc_motor bldc_motors[BLDC_MOTOR_COUNT];
+extern uint8_t motor_count;
 
 
 #define BLDC_MOTOR_STATE_ENABLED (1<<0)

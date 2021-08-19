@@ -78,11 +78,11 @@ Header file za SunTracer
 #define SF_MOVING_REF_CLR_A		(1<<13)		//motor A is executing command REF_CLR
 //#define SF_MOVING_REF_NOCLR_A		(1<<14)		//motor A is executing command REF_NOCLR
 #define SYS_PARAM_EEPROM_ERR        (1<<14)
-#define SYS_PARAM_FLASH_ERR        (1<<15)        //parameters were not stored in flash
+#define SYS_PARAM_FLASH_ERR        (1<<30)        //parameters were not stored in flash
 
-#define SF_MOVING_OUT_B               (1<<16)        //motor B is moving in
-#define SF_MOVING_IN_B            (1<<17)        //motor B is moving out        
-#define SF_MOVING_REF_CLR_B        (1<<18)        //motor B is executing command REF_CLR        
+#define SF_MOVING_OUT_B               (1<<15)        //motor B is moving in
+#define SF_MOVING_IN_B            (1<<16)        //motor B is moving out
+#define SF_MOVING_REF_CLR_B        (1<<17)        //motor B is executing command REF_CLR
 //#define SF_MOVING_REF_NOCLR_B		(1<<18)		//motor B is executing command REF_NOCLR
 #define SF_ENDSW_A_LO_PRESSED		(1<<19)		//end switch pressed A - LO
 #define SF_ENDSW_A_HI_PRESSED		(1<<20)		//end switch pressed A - HI
@@ -145,7 +145,6 @@ void go_ref(void);
 void analog_value_management(void);
 
 void led_handling(void);
-void modbus_timeout_handling(unsigned int *modbus_cnt);
 void moving_check(void);
 void end_switches (void);
 void Watchdog_Init(void);
