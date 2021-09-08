@@ -39,7 +39,7 @@ extern TIM_HandleTypeDef htim6;
 extern TIM_HandleTypeDef htim16;
 
 /* USER CODE BEGIN Private defines */
-extern TIM_HandleTypeDef hChargePumpTIM;
+extern TIM_HandleTypeDef *hChargePumpTIM;
 
 #undef  CHARGE_PUMP_PERIOD
 #undef  CHARGE_PUMP_PULSE
@@ -65,6 +65,9 @@ void MX_TIM16_Init(void);
 void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
 
 /* USER CODE BEGIN Prototypes */
+
+void My_TIMERS_PostInit(void);
+void Delay_us(uint16_t Delay);
 
 /* USER CODE END Prototypes */
 

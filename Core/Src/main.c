@@ -406,6 +406,7 @@ int main(void)
   MX_USART3_UART_Init();
   MX_TIM6_Init();
   /* USER CODE BEGIN 2 */
+  My_TIMERS_PostInit();
 
 #ifdef PRODUCTION_RELEASE 					//Code Read Protection
   FLASH_OBProgramInitTypeDef CRP_settings;
@@ -992,18 +993,25 @@ void StatusUpdate() {
   unsigned int *tracker_exstatus_p = &tracker_exstatus;
 
   uint8_t motor_count_l = 2;
+#if DEVICE != KVARK
+  motor_count_l = 1;
+#endif
   if(motor_operation & 0x0002){ // MA DC motor operation
 	bldc_motors[0].state |= BLDC_MOTOR_STATE_DC_OPERATION;
-	bldc_motors[2].state |= BLDC_MOTOR_STATE_DC_OPERATION;
 	motor_count_l++;
+#if DEVICE == KVARK
+	bldc_motors[2].state |= BLDC_MOTOR_STATE_DC_OPERATION;
+#endif
   }else{
 	  bldc_motors[0].state &= ~BLDC_MOTOR_STATE_DC_OPERATION;
 	  bldc_motors[2].state &= ~BLDC_MOTOR_STATE_DC_OPERATION;
   }
   if(motor_operation & 0x10000){ // MB DC motor operation
 	  bldc_motors[1].state |= BLDC_MOTOR_STATE_DC_OPERATION;
+#if DEVICE == KVARK
 	  bldc_motors[3].state |= BLDC_MOTOR_STATE_DC_OPERATION;
-	motor_count_l++;
+	  motor_count_l++;
+#endif
   }else{
 	  bldc_motors[1].state &= ~BLDC_MOTOR_STATE_DC_OPERATION;
 	  bldc_motors[3].state &= ~BLDC_MOTOR_STATE_DC_OPERATION;
@@ -1271,7 +1279,7 @@ void ClearStatus(uint8_t motor_id) {
 	  tracker_exstatus_p = &tracker_exstatus2;
   }
   crc_errors       = 0;
-  *tracker_status_p &= ~(0xff | SF_HALL_WIRING_A | SF_HALL_WIRING_B | SYS_PARAM_FLASH_ERR | SF_POWER_FAILURE | SF_MOVING_OUT_A | SF_MOVING_IN_A | SF_MOVING_REF_CLR_A | SF_ENDSW_A_LO_PRESSED | SF_ENDSW_A_HI_PRESSED | SF_MOVING_OUT_B | SF_MOVING_IN_B | SF_MOVING_REF_CLR_B | SF_ENDSW_B_LO_PRESSED | SF_ENDSW_B_HI_PRESSED | SF_NO_MODBUS);			//brisi zastavice
+  *tracker_status_p &= ~(0xff | SF_HALL_WIRING_A | SF_HALL_WIRING_B | SYS_PARAM_FLASH_ERR | SYS_PARAM_EEPROM_ERR | SF_POWER_FAILURE | SF_MOVING_OUT_A | SF_MOVING_IN_A | SF_MOVING_REF_CLR_A | SF_MOVING_REF_NOCLR_B | SF_ENDSW_A_LO_PRESSED | SF_ENDSW_A_HI_PRESSED | SF_MOVING_OUT_B | SF_MOVING_IN_B | SF_MOVING_REF_CLR_B | SF_ENDSW_B_LO_PRESSED | SF_ENDSW_B_HI_PRESSED | SF_NO_MODBUS);			//brisi zastavice
   *tracker_exstatus_p &= ~EFS_ERROR_CLEAR;
   bldc_ClearStatus();
   //void ClearStatus (void) {

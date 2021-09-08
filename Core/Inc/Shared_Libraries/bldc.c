@@ -211,8 +211,13 @@ void bldc_init_motors(int LoadDefaults)
       bldc_motors[i].modbus_timeout_position = 400;
       bldc_motors[i].Idetection      = 0.07;
       bldc_motors[i].end_switchDetect = 10;
-
       bldc_motors[i].speed_freewheel = FREEWHEEL_SPEED_DEFAULT_BLDC;
+#if DEVICE != KVARK
+      motor_operation = 0x10000 | 0x00002;	// DC operation both motors
+      bldc_motors[i].state |= BLDC_MOTOR_STATE_DC_OPERATION;
+      bldc_motors[i].speed_freewheel = FREEWHEEL_SPEED_DEFAULT_DC;
+#endif
+
       bldc_motors[i].speed = ZEROSPEED;
       bldc_motors[i].speed_old = ZEROSPEED;
       bldc_motors[i].ramp = 800;
@@ -348,9 +353,9 @@ void bldc_Lock(int state) {
 
 void Enable_ChargePump(uint8_t state){
   if(state == 1){
-	  HAL_TIM_PWM_MspInit(&hChargePumpTIM);
+	  HAL_TIM_PWM_MspInit(hChargePumpTIM);
   }else{
-	  HAL_TIM_PWM_MspDeInit(&hChargePumpTIM);
+	  HAL_TIM_PWM_MspDeInit(hChargePumpTIM);
   }
 }
 
@@ -793,49 +798,70 @@ void bldc_update_pwm(unsigned short value) {
 
 
 int bldc_HomeSwitchActive(unsigned char motor , unsigned char switch_h_l) {
-#if DEVICE != PICO
-  if(bldc_cm->state & BLDC_MOTOR_STATE_DC_OPERATION){	// DC Motors --One Low Switch per Port
-	  if(motor == 0 || motor == 2){
 
-		if(!ES_0_normallyOpenLo && !switch_h_l)
-		  return(!HAL_GPIO_ReadPin(END_SW_A_HI_GPIO_Port, END_SW_A_HI_Pin));
-		else if(ES_0_normallyOpenLo && !switch_h_l)
-			return(HAL_GPIO_ReadPin(END_SW_A_HI_GPIO_Port, END_SW_A_HI_Pin));
-	  }
+#if DEVICE == MICRO								//invert Low End Switches on MICRO
+	unsigned char es0 = ES_0_normallyOpenLo;
+	unsigned char es1 = ES_1_normallyOpenLo;
+	unsigned char ES_0_normallyOpenLo = 1;
+	unsigned char ES_1_normallyOpenLo = 1;
+	if(es0){
+		ES_0_normallyOpenLo = 0;
+	}
+	if(es1){
+		ES_1_normallyOpenLo = 0;
+	}
+#endif
 
+#if (DEVICE == KVARK) || ((DEVICE == MICRO) && defined(PRODUCTION_RELEASE))
+#if DEVICE == MICRO
+  if(!(bldc_cm->state & BLDC_MOTOR_STATE_DC_OPERATION)){	// BLDC Motor on MICRO --One Low Switch
+#elif DEVICE == KVARK
+  if(bldc_cm->state & BLDC_MOTOR_STATE_DC_OPERATION){	// DC Motors on KVARK --One Low Switch per Port
 	  if(motor == 1 || motor == 3){
 		if(!ES_1_normallyOpenLo && !switch_h_l)
 			return(!HAL_GPIO_ReadPin(END_SW_B_HI_GPIO_Port, END_SW_B_HI_Pin));
 		else if(ES_1_normallyOpenLo && !switch_h_l)
 			return(HAL_GPIO_ReadPin(END_SW_B_HI_GPIO_Port, END_SW_B_HI_Pin));
 	  }
+#endif
+	  if(motor == 0 || motor == 2){
+		if(!ES_0_normallyOpenLo && !switch_h_l)
+		  return(!HAL_GPIO_ReadPin(END_SW_A_HI_GPIO_Port, END_SW_A_HI_Pin));
+		else if(ES_0_normallyOpenLo && !switch_h_l)
+			return(HAL_GPIO_ReadPin(END_SW_A_HI_GPIO_Port, END_SW_A_HI_Pin));
+	  }
 	  return 0;
   }
 #endif
 
 
-  if (motor == 0){										//BLDC Motors -- Low and High switch for every motor
-#if DEVICE != PICO
+  if (motor == 0){										//BLDC Motors on KVARK -- Low and High switch for every motor
+#if DEVICE != PICO										//or DC on MICRO/PICO
     if(!ES_0_normallyOpenLo && !switch_h_l)
       return(HAL_GPIO_ReadPin(END_SW_A_LO_GPIO_Port, END_SW_A_LO_Pin));
     else if(ES_0_normallyOpenLo && !switch_h_l)
     	return(!HAL_GPIO_ReadPin(END_SW_A_LO_GPIO_Port, END_SW_A_LO_Pin));
 #endif
+#if DEVICE != MICRO || defined(PRODUCTION_RELEASE)	//only switch on PICO
     if(!ES_0_normallyOpenHi && switch_h_l)
     	return(!HAL_GPIO_ReadPin(END_SW_A_HI_GPIO_Port, END_SW_A_HI_Pin));
     else if(ES_0_normallyOpenHi && switch_h_l)
     	return(HAL_GPIO_ReadPin(END_SW_A_HI_GPIO_Port, END_SW_A_HI_Pin));
+#endif
   }
+
 #if DEVICE != PICO
   else if (motor == 1){
     if(!ES_1_normallyOpenLo && !switch_h_l)
     	return(HAL_GPIO_ReadPin(END_SW_B_LO_GPIO_Port, END_SW_B_LO_Pin));
     else if(ES_1_normallyOpenLo && !switch_h_l)
     	return(!HAL_GPIO_ReadPin(END_SW_B_LO_GPIO_Port, END_SW_B_LO_Pin));
+#if DEVICE != MICRO || defined(PRODUCTION_RELEASE)
     else if(!ES_1_normallyOpenHi && switch_h_l)
     	return(!HAL_GPIO_ReadPin(END_SW_B_HI_GPIO_Port, END_SW_B_HI_Pin));
     else if(ES_1_normallyOpenHi && switch_h_l)
     	return(HAL_GPIO_ReadPin(END_SW_B_HI_GPIO_Port, END_SW_B_HI_Pin));
+#endif
   }
 #endif
   return 0;
@@ -1428,7 +1454,11 @@ void set_external_INT(uint8_t motor, uint8_t state){
 		  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
 		  bldc_motors[motor].speed_freewheel = FREEWHEEL_SPEED_DEFAULT_DC;
 	  }
+#if DEVICE == KVARK
 	  GPIO_InitStruct.Pull = GPIO_PULLUP;
+#else
+	  GPIO_InitStruct.Pull = GPIO_NOPULL;
+#endif
 	  if(motor == MOTOR_0){
 		  GPIO_InitStruct.Pin = HALL_A1_Pin;
 		  HAL_GPIO_DeInit(HALL_A1_GPIO_Port, HALL_A1_Pin); 		//Disables EINT genration

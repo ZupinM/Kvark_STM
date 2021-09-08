@@ -21,7 +21,7 @@
 #include "tim.h"
 
 /* USER CODE BEGIN 0 */
-TIM_HandleTypeDef hChargePumpTIM;
+TIM_HandleTypeDef *hChargePumpTIM;
 /* USER CODE END 0 */
 
 TIM_HandleTypeDef htim1;
@@ -132,9 +132,9 @@ void MX_TIM1_Init(void)
 	  }
 
 #if DEVICE == KVARK
-	  hChargePumpTIM = htim3;
+	  hChargePumpTIM = &htim3;
 #else
-	  hChargePumpTIM = htim2;
+	  hChargePumpTIM = &htim2;
 #endif
   /* USER CODE END TIM1_Init 2 */
   HAL_TIM_MspPostInit(&htim1);
@@ -179,12 +179,6 @@ void MX_TIM3_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN TIM3_Init 2 */
-
-  /* Start channel 1 */
-  if (HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_4) != HAL_OK)
-  {
-	Error_Handler();
-  }
 
   /* USER CODE END TIM3_Init 2 */
   HAL_TIM_MspPostInit(&htim3);
@@ -366,31 +360,6 @@ void HAL_TIM_MspPostInit(TIM_HandleTypeDef* timHandle)
 
   /* USER CODE BEGIN TIM3_MspPostInit 1 */
 
-    GPIO_InitStruct.Pin = MOTOR_A_2H_Pin|MOTOR_B_2H_Pin|MOTOR_B_3H_Pin;
-    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-    GPIO_InitStruct.Alternate = GPIO_AF1_TIM1;
-    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
-
-	GPIO_InitStruct.Pin = MOTOR_A_1L_Pin;
-	HAL_GPIO_Init(MOTOR_A_1L_GPIO_Port, &GPIO_InitStruct);
-
-	GPIO_InitStruct.Pin = MOTOR_A_2L_Pin;
-	HAL_GPIO_Init(MOTOR_A_2L_GPIO_Port, &GPIO_InitStruct);
-
-	GPIO_InitStruct.Pin = MOTOR_A_3L_Pin;
-	HAL_GPIO_Init(MOTOR_A_3L_GPIO_Port, &GPIO_InitStruct);
-
-	setGPIO_Function(MOTOR_A_1H_GPIO_Port, MOTOR_A_1H_Pin, MODE_OUTPUT);
-	setGPIO_Function(MOTOR_A_2H_GPIO_Port, MOTOR_A_2H_Pin, MODE_OUTPUT);
-	setGPIO_Function(MOTOR_A_3H_GPIO_Port, MOTOR_A_3H_Pin, MODE_OUTPUT);
-
-	setGPIO_Function(MOTOR_A_1L_GPIO_Port, MOTOR_A_1L_Pin, MODE_OUTPUT);
-	setGPIO_Function(MOTOR_A_2L_GPIO_Port, MOTOR_A_2L_Pin, MODE_OUTPUT);
-	setGPIO_Function(MOTOR_A_3L_GPIO_Port, MOTOR_A_3L_Pin, MODE_OUTPUT);
-
   /* USER CODE END TIM3_MspPostInit 1 */
   }
 
@@ -528,6 +497,52 @@ void reconfigure_TIM(uint8_t motor, uint8_t mode){
     }
 
 }
+
+void My_TIMERS_PostInit(void){
+
+		/* Start CHARGE PUMP TIMER*/
+		if (HAL_TIM_PWM_Start(hChargePumpTIM, TIM_CHANNEL_4) != HAL_OK)
+		{
+			Error_Handler();
+		}
+
+	  	GPIO_InitTypeDef GPIO_InitStruct = {0};
+
+	    GPIO_InitStruct.Pin = MOTOR_A_2H_Pin|MOTOR_B_2H_Pin|MOTOR_B_3H_Pin;
+	    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+	    GPIO_InitStruct.Pull = GPIO_NOPULL;
+	    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+	    GPIO_InitStruct.Alternate = GPIO_AF1_TIM1;
+	    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+
+		GPIO_InitStruct.Pin = MOTOR_A_1L_Pin;
+		HAL_GPIO_Init(MOTOR_A_1L_GPIO_Port, &GPIO_InitStruct);
+
+		GPIO_InitStruct.Pin = MOTOR_A_2L_Pin;
+		HAL_GPIO_Init(MOTOR_A_2L_GPIO_Port, &GPIO_InitStruct);
+
+		GPIO_InitStruct.Pin = MOTOR_A_3L_Pin;
+		HAL_GPIO_Init(MOTOR_A_3L_GPIO_Port, &GPIO_InitStruct);
+
+		setGPIO_Function(MOTOR_A_1H_GPIO_Port, MOTOR_A_1H_Pin, MODE_OUTPUT);
+		setGPIO_Function(MOTOR_A_2H_GPIO_Port, MOTOR_A_2H_Pin, MODE_OUTPUT);
+		setGPIO_Function(MOTOR_A_3H_GPIO_Port, MOTOR_A_3H_Pin, MODE_OUTPUT);
+
+		setGPIO_Function(MOTOR_A_1L_GPIO_Port, MOTOR_A_1L_Pin, MODE_OUTPUT);
+		setGPIO_Function(MOTOR_A_2L_GPIO_Port, MOTOR_A_2L_Pin, MODE_OUTPUT);
+		setGPIO_Function(MOTOR_A_3L_GPIO_Port, MOTOR_A_3L_Pin, MODE_OUTPUT);
+}
+
+void Delay_us(uint16_t Delay){ // Rounded up to 2.5us increments
+
+	  uint16_t tickstart = __HAL_TIM_GET_COUNTER(&htim16);
+
+	  while (((__HAL_TIM_GET_COUNTER(&htim16) - tickstart) * 2.5) < Delay)
+	  {
+	  }
+}
+
 
 /* USER CODE END 1 */
 

@@ -101,61 +101,69 @@ uint8_t motorStarting;
 
 
 static inline void motor_accelerate(int pid_out){
-
+	uint8_t motor = bldc_cm->index;
+#if DEVICE != KVARK
+	if(motor){
+		motor = 2;
+	}
+#endif
 	if(!(bldc_cm->state & BLDC_MOTOR_STATE_DC_OPERATION)){
 		bldc_cm->state &= ~BLDC_MOTOR_STATE_BRAKING;
 	}
 	else //DC operation
 	{
+	  bldc_update_pwm(pid_out);
 	  //Motor 0 & Motor 2
-	  if (bldc_cm->index == 0 || bldc_cm->index == 1){
+	  if (motor == 0 || motor == 1){
 		if(!(bldc_cm->status & BLDC_STATUS_CCW)){
 		  //LPC_TMR16B0->MR1 = 0;
-		  setGPIO_Function(MOTOR_2H_PORT(bldc_cm->index), MOTOR_2H_PIN(bldc_cm->index), MODE_OUTPUT);
-		  setGPIO_Function(MOTOR_3H_PORT(bldc_cm->index), MOTOR_3H_PIN(bldc_cm->index), MODE_OUTPUT);
-		  HAL_GPIO_WritePin(MOTOR_3L_PORT(bldc_cm->index), MOTOR_3L_PIN(bldc_cm->index), GPIO_PIN_RESET);	//disable MOTOR_EN_2
-		  HAL_GPIO_WritePin(MOTOR_1L_PORT(bldc_cm->index), MOTOR_1L_PIN(bldc_cm->index), GPIO_PIN_RESET);	//disable MOTOR_EN_1
+		  HAL_GPIO_WritePin(MOTOR_1L_PORT(motor), MOTOR_1L_PIN(motor), GPIO_PIN_RESET);	//disable MOTOR_EN_1
+		  setGPIO_Function(MOTOR_2H_PORT(motor), MOTOR_2H_PIN(motor), MODE_OUTPUT);
+		  setGPIO_Function(MOTOR_3H_PORT(motor), MOTOR_3H_PIN(motor), MODE_OUTPUT);
+		  HAL_GPIO_WritePin(MOTOR_3L_PORT(motor), MOTOR_3L_PIN(motor), GPIO_PIN_RESET);	//disable MOTOR_EN_2
 		  //LPC_TMR16B0->MR0 = pid_out;
-		  setGPIO_Function(MOTOR_1H_PORT(bldc_cm->index), MOTOR_1H_PIN(bldc_cm->index), MODE_ALTERNATE);
-		  HAL_GPIO_WritePin(MOTOR_2L_PORT(bldc_cm->index), MOTOR_2L_PIN(bldc_cm->index), GPIO_PIN_SET);		//enable  MOTOR_EN_12
+		  Delay_us(10);
+		  HAL_GPIO_WritePin(MOTOR_2L_PORT(motor), MOTOR_2L_PIN(motor), GPIO_PIN_SET);		//enable  MOTOR_EN_12
+		  setGPIO_Function(MOTOR_1H_PORT(motor), MOTOR_1H_PIN(motor), MODE_ALTERNATE);
 		}
 		else{
 		  //LPC_TMR16B0->MR0 = 0;
-		  setGPIO_Function(MOTOR_1H_PORT(bldc_cm->index), MOTOR_1H_PIN(bldc_cm->index), MODE_OUTPUT);
-		  setGPIO_Function(MOTOR_3H_PORT(bldc_cm->index), MOTOR_3H_PIN(bldc_cm->index), MODE_OUTPUT);
-		  HAL_GPIO_WritePin(MOTOR_3L_PORT(bldc_cm->index), MOTOR_3L_PIN(bldc_cm->index), GPIO_PIN_RESET);	//disable MOTOR_EN_2
-		  HAL_GPIO_WritePin(MOTOR_2L_PORT(bldc_cm->index), MOTOR_2L_PIN(bldc_cm->index), GPIO_PIN_RESET);	//disable MOTOR_EN_12
+		  HAL_GPIO_WritePin(MOTOR_2L_PORT(motor), MOTOR_2L_PIN(motor), GPIO_PIN_RESET);	//disable MOTOR_EN_12
+		  setGPIO_Function(MOTOR_1H_PORT(motor), MOTOR_1H_PIN(motor), MODE_OUTPUT);
+		  setGPIO_Function(MOTOR_3H_PORT(motor), MOTOR_3H_PIN(motor), MODE_OUTPUT);
+		  HAL_GPIO_WritePin(MOTOR_3L_PORT(motor), MOTOR_3L_PIN(motor), GPIO_PIN_RESET);	//disable MOTOR_EN_2
 		  //LPC_TMR16B0->MR1 = pid_out;
-		  setGPIO_Function(MOTOR_2H_PORT(bldc_cm->index), MOTOR_2H_PIN(bldc_cm->index), MODE_ALTERNATE);
-		  HAL_GPIO_WritePin(MOTOR_1L_PORT(bldc_cm->index), MOTOR_1L_PIN(bldc_cm->index), GPIO_PIN_SET);		//enable  MOTOR_EN_1
+		  Delay_us(10);
+		  HAL_GPIO_WritePin(MOTOR_1L_PORT(motor), MOTOR_1L_PIN(motor), GPIO_PIN_SET);		//enable  MOTOR_EN_1
+		  setGPIO_Function(MOTOR_2H_PORT(motor), MOTOR_2H_PIN(motor), MODE_ALTERNATE);
 		}
 	  }
 	  //Motor 1 & Motor 3
-	  if (bldc_cm->index == 2 || bldc_cm->index == 3) {
+	  if (motor == 2 || motor == 3) {
 		  if(!(bldc_cm->status & BLDC_STATUS_CCW)){
 		  //LPC_TMR16B0->MR1 = 0;
-		  setGPIO_Function(MOTOR_2H_PORT(bldc_cm->index -2), MOTOR_2H_PIN(bldc_cm->index -2), MODE_OUTPUT);
-		  setGPIO_Function(MOTOR_1H_PORT(bldc_cm->index -2), MOTOR_1H_PIN(bldc_cm->index -2), MODE_OUTPUT);
-		  HAL_GPIO_WritePin(MOTOR_3L_PORT(bldc_cm->index -2), MOTOR_3L_PIN(bldc_cm->index -2), GPIO_PIN_RESET);	//disable MOTOR_EN_2
-		  HAL_GPIO_WritePin(MOTOR_1L_PORT(bldc_cm->index -2), MOTOR_1L_PIN(bldc_cm->index -2), GPIO_PIN_RESET);	//disable MOTOR_EN_1
+		  HAL_GPIO_WritePin(MOTOR_3L_PORT(motor -2), MOTOR_3L_PIN(motor -2), GPIO_PIN_RESET);	//disable MOTOR_EN_2
+		  setGPIO_Function(MOTOR_2H_PORT(motor -2), MOTOR_2H_PIN(motor -2), MODE_OUTPUT);
+		  setGPIO_Function(MOTOR_1H_PORT(motor -2), MOTOR_1H_PIN(motor -2), MODE_OUTPUT);
+		  HAL_GPIO_WritePin(MOTOR_1L_PORT(motor -2), MOTOR_1L_PIN(motor -2), GPIO_PIN_RESET);	//disable MOTOR_EN_1
 		  //LPC_TMR16B1->MR0 = pid_out;
-		  setGPIO_Function(MOTOR_3H_PORT(bldc_cm->index -2), MOTOR_3H_PIN(bldc_cm->index -2), MODE_ALTERNATE);
-		  HAL_GPIO_WritePin(MOTOR_2L_PORT(bldc_cm->index -2), MOTOR_2L_PIN(bldc_cm->index -2), GPIO_PIN_SET);		//enable  MOTOR_EN_12
+		  Delay_us(10);
+		  HAL_GPIO_WritePin(MOTOR_2L_PORT(motor -2), MOTOR_2L_PIN(motor -2), GPIO_PIN_SET);		//enable  MOTOR_EN_12
+		  setGPIO_Function(MOTOR_3H_PORT(motor -2), MOTOR_3H_PIN(motor -2), MODE_ALTERNATE);
 		}
 		else{
 		  //LPC_TMR16B1->MR0 = 0;
-		  setGPIO_Function(MOTOR_3H_PORT(bldc_cm->index -2), MOTOR_3H_PIN(bldc_cm->index -2), MODE_OUTPUT);
-		  setGPIO_Function(MOTOR_1H_PORT(bldc_cm->index -2), MOTOR_1H_PIN(bldc_cm->index -2), MODE_OUTPUT);
-		  HAL_GPIO_WritePin(MOTOR_1L_PORT(bldc_cm->index -2), MOTOR_1L_PIN(bldc_cm->index -2), GPIO_PIN_RESET);	//disable MOTOR_EN_1
-		  HAL_GPIO_WritePin(MOTOR_2L_PORT(bldc_cm->index -2), MOTOR_2L_PIN(bldc_cm->index -2), GPIO_PIN_RESET);	//disable MOTOR_EN_12
-
-		  setGPIO_Function(MOTOR_2H_PORT(bldc_cm->index -2), MOTOR_2H_PIN(bldc_cm->index -2), MODE_ALTERNATE);	//LPC_TMR16B0->MR1 = pid_out;
-		  HAL_GPIO_WritePin(MOTOR_3L_PORT(bldc_cm->index -2), MOTOR_3L_PIN(bldc_cm->index -2), GPIO_PIN_SET);		//enable  MOTOR_EN_2
+		  HAL_GPIO_WritePin(MOTOR_2L_PORT(motor -2), MOTOR_2L_PIN(motor -2), GPIO_PIN_RESET);	//disable MOTOR_EN_12
+		  setGPIO_Function(MOTOR_3H_PORT(motor -2), MOTOR_3H_PIN(motor -2), MODE_OUTPUT);
+		  setGPIO_Function(MOTOR_1H_PORT(motor -2), MOTOR_1H_PIN(motor -2), MODE_OUTPUT);
+		  HAL_GPIO_WritePin(MOTOR_1L_PORT(motor -2), MOTOR_1L_PIN(motor -2), GPIO_PIN_RESET);	//disable MOTOR_EN_1
+		  Delay_us(10);
+		  HAL_GPIO_WritePin(MOTOR_3L_PORT(motor -2), MOTOR_3L_PIN(motor -2), GPIO_PIN_SET);		//enable  MOTOR_EN_2
+		  setGPIO_Function(MOTOR_2H_PORT(motor -2), MOTOR_2H_PIN(motor -2), MODE_ALTERNATE);	//LPC_TMR16B0->MR1 = pid_out;
 		  //enable MOTOR_EN_2
 		}
 	  }
 	}
-	bldc_update_pwm(pid_out);
 	if(bldc_cm->speed == ZEROSPEED){
 		bldc_cm->status &= ~BLDC_STATUS_ACTIVE; // Required to start ActivateDrivers(1)
 		ActivateDrivers(1);
@@ -163,70 +171,79 @@ static inline void motor_accelerate(int pid_out){
 }
 
 static inline void motor_brake(int pid_out){
-
+	uint8_t motor = bldc_cm->index;
+	uint8_t activate_hard_break = 0;
+#if DEVICE != KVARK
+	if(motor){
+		motor = 2;
+	}
+#endif
 	if(!(bldc_cm->state & BLDC_MOTOR_STATE_DC_OPERATION)){
 		bldc_cm->state |= BLDC_MOTOR_STATE_BRAKING;
 	}
 	else //DC operation
 	{
-		  //A MOTOR
-		  if (bldc_cm->index == 0 || bldc_cm->index == 1){
-			if(bldc_cm->status & BLDC_STATUS_CCW){
-			  setGPIO_Function(MOTOR_2H_PORT(bldc_cm->index), MOTOR_2H_PIN(bldc_cm->index), MODE_OUTPUT);		//LPC_TMR16B0->MR1 = 0;
-			  setGPIO_Function(MOTOR_3H_PORT(bldc_cm->index), MOTOR_3H_PIN(bldc_cm->index), MODE_OUTPUT);
-			  HAL_GPIO_WritePin(MOTOR_3L_PORT(bldc_cm->index), MOTOR_3L_PIN(bldc_cm->index), GPIO_PIN_RESET);	//disable MOTOR_EN_2
-			  HAL_GPIO_WritePin(MOTOR_1L_PORT(bldc_cm->index), MOTOR_1L_PIN(bldc_cm->index), GPIO_PIN_RESET);	//disable MOTOR_EN_1
+		  if(pid_out > PWM_MAX_NEG_DC){ // back-EMF braking on first half + active braking on second
+			activate_hard_break = 1;
+			pid_out -= PWM_MAX_NEG_DC;
+		  }
+		  if(pid_out < 10){
+			pid_out = 10;
+		  }
+		  bldc_update_pwm(pid_out);
 
-			  setGPIO_Function(MOTOR_1H_PORT(bldc_cm->index), MOTOR_1H_PIN(bldc_cm->index), MODE_ALTERNATE);	//LPC_TMR16B0->MR0 = pid_out;
-			  if(pid_out > PWM_MAX_NEG_DC){ // back-EMF braking on first half + active braking on second
-				  HAL_GPIO_WritePin(MOTOR_2L_PORT(bldc_cm->index), MOTOR_2L_PIN(bldc_cm->index), GPIO_PIN_SET);		//enable  MOTOR_EN_12
+		  //A MOTOR
+		  if (motor == 0 || motor == 1){
+			if(bldc_cm->status & BLDC_STATUS_CCW){
+			  HAL_GPIO_WritePin(MOTOR_1L_PORT(motor), MOTOR_1L_PIN(motor), GPIO_PIN_RESET);	//disable MOTOR_EN_1
+			  setGPIO_Function(MOTOR_2H_PORT(motor), MOTOR_2H_PIN(motor), MODE_OUTPUT);		//LPC_TMR16B0->MR1 = 0;
+			  setGPIO_Function(MOTOR_3H_PORT(motor), MOTOR_3H_PIN(motor), MODE_OUTPUT);
+			  HAL_GPIO_WritePin(MOTOR_3L_PORT(motor), MOTOR_3L_PIN(motor), GPIO_PIN_RESET);	//disable MOTOR_EN_2
+			  Delay_us(10);
+			  if(activate_hard_break){ // back-EMF braking on first half + active braking on second
+				  HAL_GPIO_WritePin(MOTOR_2L_PORT(motor), MOTOR_2L_PIN(motor), GPIO_PIN_SET);		//enable  MOTOR_EN_12
 			  }
+			  setGPIO_Function(MOTOR_1H_PORT(motor), MOTOR_1H_PIN(motor), MODE_ALTERNATE);	//LPC_TMR16B0->MR0 = pid_out;
 			}
 			else{
-			  setGPIO_Function(MOTOR_1H_PORT(bldc_cm->index), MOTOR_1H_PIN(bldc_cm->index), MODE_OUTPUT);		//LPC_TMR16B0->MR0 = 0;
-			  setGPIO_Function(MOTOR_3H_PORT(bldc_cm->index), MOTOR_3H_PIN(bldc_cm->index), MODE_OUTPUT);
-			  HAL_GPIO_WritePin(MOTOR_3L_PORT(bldc_cm->index), MOTOR_3L_PIN(bldc_cm->index), GPIO_PIN_RESET);	//disable MOTOR_EN_2
-			  HAL_GPIO_WritePin(MOTOR_2L_PORT(bldc_cm->index), MOTOR_2L_PIN(bldc_cm->index), GPIO_PIN_RESET);	//disable MOTOR_EN_12
-
-			  setGPIO_Function(MOTOR_2H_PORT(bldc_cm->index), MOTOR_2H_PIN(bldc_cm->index), MODE_ALTERNATE);	//LPC_TMR16B0->MR1 = pid_out;
-			  if(pid_out > PWM_MAX_NEG_DC){
-				  HAL_GPIO_WritePin(MOTOR_1L_PORT(bldc_cm->index), MOTOR_1L_PIN(bldc_cm->index), GPIO_PIN_SET); 		//enable  MOTOR_EN_1
+			  HAL_GPIO_WritePin(MOTOR_3L_PORT(motor), MOTOR_3L_PIN(motor), GPIO_PIN_RESET);	//disable MOTOR_EN_2
+			  setGPIO_Function(MOTOR_1H_PORT(motor), MOTOR_1H_PIN(motor), MODE_OUTPUT);		//LPC_TMR16B0->MR0 = 0;
+			  setGPIO_Function(MOTOR_3H_PORT(motor), MOTOR_3H_PIN(motor), MODE_OUTPUT);
+			  HAL_GPIO_WritePin(MOTOR_2L_PORT(motor), MOTOR_2L_PIN(motor), GPIO_PIN_RESET);	//disable MOTOR_EN_12
+			  Delay_us(10);
+			  if(activate_hard_break){
+				  HAL_GPIO_WritePin(MOTOR_1L_PORT(motor), MOTOR_1L_PIN(motor), GPIO_PIN_SET); 		//enable  MOTOR_EN_1
 			  }
+			  setGPIO_Function(MOTOR_2H_PORT(motor), MOTOR_2H_PIN(motor), MODE_ALTERNATE);	//LPC_TMR16B0->MR1 = pid_out;
 			}
 		  }
 		  //B MOTOR
-		  if (bldc_cm->index == 2 || bldc_cm->index == 3) {
+		  if (motor == 2 || motor == 3) {
 			if(bldc_cm->status & BLDC_STATUS_CCW){
-			  setGPIO_Function(MOTOR_2H_PORT(bldc_cm->index -2), MOTOR_2H_PIN(bldc_cm->index -2), MODE_OUTPUT);		//LPC_TMR16B0->MR1 = 0;
-			  setGPIO_Function(MOTOR_1H_PORT(bldc_cm->index -2), MOTOR_1H_PIN(bldc_cm->index -2), MODE_OUTPUT);
-			  HAL_GPIO_WritePin(MOTOR_3L_PORT(bldc_cm->index -2), MOTOR_3L_PIN(bldc_cm->index -2), GPIO_PIN_RESET);	//disable MOTOR_EN_2
-			  HAL_GPIO_WritePin(MOTOR_1L_PORT(bldc_cm->index -2), MOTOR_1L_PIN(bldc_cm->index -2), GPIO_PIN_RESET);	//disable MOTOR_EN_1
-
-			  setGPIO_Function(MOTOR_3H_PORT(bldc_cm->index -2), MOTOR_3H_PIN(bldc_cm->index -2), MODE_ALTERNATE);	//LPC_TMR16B1->MR0 = pid_out;
-			  if(pid_out > PWM_MAX_NEG_DC){ // back-EMF braking on first half + active braking on second
-				  HAL_GPIO_WritePin(MOTOR_2L_PORT(bldc_cm->index -2), MOTOR_2L_PIN(bldc_cm->index -2), GPIO_PIN_SET);		//enable  MOTOR_EN_12
+			  HAL_GPIO_WritePin(MOTOR_3L_PORT(motor -2), MOTOR_3L_PIN(motor -2), GPIO_PIN_RESET);	//disable MOTOR_EN_2
+			  setGPIO_Function(MOTOR_2H_PORT(motor -2), MOTOR_2H_PIN(motor -2), MODE_OUTPUT);		//LPC_TMR16B0->MR1 = 0;
+			  setGPIO_Function(MOTOR_1H_PORT(motor -2), MOTOR_1H_PIN(motor -2), MODE_OUTPUT);
+			  HAL_GPIO_WritePin(MOTOR_1L_PORT(motor -2), MOTOR_1L_PIN(motor -2), GPIO_PIN_RESET);	//disable MOTOR_EN_1
+			  Delay_us(10);
+			  if(activate_hard_break){ // back-EMF braking on first half + active braking on second
+				  HAL_GPIO_WritePin(MOTOR_2L_PORT(motor -2), MOTOR_2L_PIN(motor -2), GPIO_PIN_SET);		//enable  MOTOR_EN_12
 			  }
+			  setGPIO_Function(MOTOR_3H_PORT(motor -2), MOTOR_3H_PIN(motor -2), MODE_ALTERNATE);	//LPC_TMR16B1->MR0 = pid_out;
 			}
 			else{
-			  setGPIO_Function(MOTOR_3H_PORT(bldc_cm->index -2), MOTOR_3H_PIN(bldc_cm->index -2), MODE_OUTPUT);		//LPC_TMR16B1->MR0 = 0;
-			  setGPIO_Function(MOTOR_1H_PORT(bldc_cm->index -2), MOTOR_1H_PIN(bldc_cm->index -2), MODE_OUTPUT);
-			  HAL_GPIO_WritePin(MOTOR_1L_PORT(bldc_cm->index -2), MOTOR_1L_PIN(bldc_cm->index -2), GPIO_PIN_RESET);	//disable MOTOR_EN_1
-			  HAL_GPIO_WritePin(MOTOR_2L_PORT(bldc_cm->index -2), MOTOR_2L_PIN(bldc_cm->index -2), GPIO_PIN_RESET);	//disable MOTOR_EN_12
-
-			  setGPIO_Function(MOTOR_2H_PORT(bldc_cm->index -2), MOTOR_2H_PIN(bldc_cm->index -2), MODE_ALTERNATE);	//LPC_TMR16B0->MR1 = pid_out;
-			  if(pid_out > PWM_MAX_NEG_DC){
-				  HAL_GPIO_WritePin(MOTOR_3L_PORT(bldc_cm->index -2), MOTOR_3L_PIN(bldc_cm->index -2), GPIO_PIN_SET); 		//enable  MOTOR_EN_1
+			  HAL_GPIO_WritePin(MOTOR_2L_PORT(motor -2), MOTOR_2L_PIN(motor -2), GPIO_PIN_RESET);	//disable MOTOR_EN_12
+			  setGPIO_Function(MOTOR_3H_PORT(motor -2), MOTOR_3H_PIN(motor -2), MODE_OUTPUT);		//LPC_TMR16B1->MR0 = 0;
+			  setGPIO_Function(MOTOR_1H_PORT(motor -2), MOTOR_1H_PIN(motor -2), MODE_OUTPUT);
+			  HAL_GPIO_WritePin(MOTOR_1L_PORT(motor -2), MOTOR_1L_PIN(motor -2), GPIO_PIN_RESET);	//disable MOTOR_EN_1
+			  Delay_us(10);
+			  if(activate_hard_break){
+				  HAL_GPIO_WritePin(MOTOR_3L_PORT(motor -2), MOTOR_3L_PIN(motor -2), GPIO_PIN_SET); 		//enable  MOTOR_EN_1
 			  }
+			  setGPIO_Function(MOTOR_2H_PORT(motor -2), MOTOR_2H_PIN(motor -2), MODE_ALTERNATE);	//LPC_TMR16B0->MR1 = pid_out;
+			 // __HAL_TIM_SET_COUNTER(&htim1, MOTOR_PWM_PERIOD);
 			}
 		  }
 	}
-	if(pid_out > PWM_MAX_NEG_DC){ // back-EMF braking on first half + active braking on second
-		pid_out -= PWM_MAX_NEG_DC;
-	}
-	if(pid_out < 10){
-		pid_out = 10;
-	}
-	bldc_update_pwm(pid_out);
 	if(bldc_cm->speed == ZEROSPEED){
 		bldc_cm->status &= ~BLDC_STATUS_ACTIVE; // Required to start ActivateDrivers(1)
 		ActivateDrivers(1);
@@ -328,6 +345,7 @@ void position_handling(void) {
     }
     if(stop_started){ //MOTOR STOPING
 
+      //SEGGER_RTT_printf(0, "stopping\r\n");
       if(stopTime == 0 && was_full_speed_move){    //Measure stop time on 1st stop
         if(stopTime_cnt == 0){ // Measure freewheel speed on start of stoping time measurement
         	bldc_cm->speed_freewheel = bldc_cm->speed;
@@ -396,7 +414,7 @@ void position_handling(void) {
         speed_err_new = speed_err;
       }
 #endif
-      //SEGGER_RTT_printf(0, "e%d, p%d s%d\r\n", err_position, pid_out, bldc_cm->speed);
+      SEGGER_RTT_printf(0, "e%d, p%d s%d\r\n", err_position, pid_out, bldc_cm->speed);
       if(pid_out > 0){ //ACCELERATE
           if(pid_out > MOTOR_PWM_PERIOD){ //Limits
             pid_out = MOTOR_PWM_PERIOD;
@@ -472,7 +490,7 @@ void DC_QuadEncoder(void){
 	uint8_t motor = bldc_cm->index;
 	//----------A-MOTOR Fast Hall Read
 	  if (!(bldc_cm->state & BLDC_MOTOR_STATE_DC_B_MOTOR) || (bldc_cm->state & BLDC_MOTOR_STATE_DC_AB_MOTOR) ){
-	    if(get_Hall_Enable(motor, HALL_ENABLED_A)) { //Read motor speed 4x per turn
+	    if(get_Hall_Enable(motor, HALL_ENABLED_A))  {//Read motor speed 4x per turn
 	      //----- Hall A1 -----
 	      if (getHallState1(motor) == GPIO_PIN_SET) {  				// *** hall 1 = 1 ***
 	        if(hallState_prev_A1[motor] == 0){

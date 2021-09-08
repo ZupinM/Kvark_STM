@@ -83,7 +83,7 @@ Header file za SunTracer
 #define SF_MOVING_OUT_B               (1<<15)        //motor B is moving in
 #define SF_MOVING_IN_B            (1<<16)        //motor B is moving out
 #define SF_MOVING_REF_CLR_B        (1<<17)        //motor B is executing command REF_CLR
-//#define SF_MOVING_REF_NOCLR_B		(1<<18)		//motor B is executing command REF_NOCLR
+#define SF_MOVING_REF_NOCLR_B		(1<<18)		//motor B is executing command REF_NOCLR
 #define SF_ENDSW_A_LO_PRESSED		(1<<19)		//end switch pressed A - LO
 #define SF_ENDSW_A_HI_PRESSED		(1<<20)		//end switch pressed A - HI
 #define SF_ENDSW_B_LO_PRESSED		(1<<21)		//end switch pressed B - LO
