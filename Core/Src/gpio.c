@@ -52,7 +52,7 @@ void MX_GPIO_Init(void)
   __HAL_RCC_GPIOD_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOC, Xbee_RESET_Pin|LED_GR_Pin|LED_BL_Pin|DIVIDER_SENSOR_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOC, LoRa_RESET_Pin|LED_GR_Pin|LED_BL_Pin|DIVIDER_SENSOR_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOA, LORA_NSS_Pin|MOTOR_A_2H_Pin|MOTOR_B_2H_Pin|MOTOR_B_3H_Pin, GPIO_PIN_RESET);
@@ -74,7 +74,7 @@ void MX_GPIO_Init(void)
   HAL_GPIO_Init(BT3_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : PCPin PCPin PCPin PCPin */
-  GPIO_InitStruct.Pin = Xbee_RESET_Pin|LED_GR_Pin|LED_BL_Pin|DIVIDER_SENSOR_Pin;
+  GPIO_InitStruct.Pin = LoRa_RESET_Pin|LED_GR_Pin|LED_BL_Pin|DIVIDER_SENSOR_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -214,7 +214,7 @@ uint8_t voltage_select      = 12;
 uint8_t voltage_select_old  = 12;
 
 void HallVoltage(){
-
+#if DEVICE != PICO
   if (voltage_select != voltage_select_old){
     if(voltage_select == 5){
     	HAL_GPIO_WritePin(V_SELECT_A_GPIO_Port, V_SELECT_A_Pin, GPIO_PIN_RESET);
@@ -231,6 +231,7 @@ void HallVoltage(){
 
     voltage_select_old = voltage_select;
   }
+#endif
 }
 
 

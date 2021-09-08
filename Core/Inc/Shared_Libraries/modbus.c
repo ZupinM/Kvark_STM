@@ -43,9 +43,7 @@ unsigned int* tracker_exstatus_p[2] = {&tracker_exstatus, &tracker_exstatus2};
 extern uint8_t usb_drive;
 extern uint8_t voltage_select;
 extern float UVccHALL_0, UVccHALL_1;
-#if (DEVICE == KVARK || DEVICE == PICO)
 extern MODE_TYPE mode;
-#endif
 unsigned int number_TX_bytes0;
 unsigned int number_TX_bytes1;
 unsigned int number_TX_bytes2;
@@ -122,7 +120,7 @@ uint8_t slave_addr_l;
 /***********************************************************
   MODBUS COMMANDS
 ************************************************************/
-#if (DEVICE == KVARK || DEVICE == PICO)
+#if (DEVICE == KVARK || DEVICE == PICO || DEVICE == MICRO)
 /***********************************************************
   RX from LORA (Sigma) for KVARK (this positioner)
 ************************************************************/

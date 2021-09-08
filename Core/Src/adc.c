@@ -328,7 +328,7 @@ uint32_t zeroCurrent_voltage_1;
 float GetAnalogValues(unsigned char measuring_point) {
 
   if(Uavg == 0){	//First measurment unfiltered
-    Uavg = g_ADCBuffer[0];
+    Uavg = g_ADCBuffer[1];
   }
   Uavg = Uavg + ( (int)(g_ADCBuffer[1] - Uavg)*0.01);//integrator
   Iavg_A = Iavg_A + ( (int)((g_ADCBuffer[2] - zeroCurrent_voltage_0) - Iavg_A)*0.01);//integrator

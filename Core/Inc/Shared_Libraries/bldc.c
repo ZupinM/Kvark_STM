@@ -765,10 +765,12 @@ void Flag_check() {
       if(bldc_motors[i].ctrl == BLDC_CTRL_HOMING)
         bldc_motors[i].status|= BLDC_STATUS_HOMING;
     }
+#if DEVICE != PICO
     if((bldc_motors[i].state & BLDC_MOTOR_STATE_DC_OPERATION) != old_motor_mode[i]){
     	set_external_INT(i, !(bldc_motors[i].state & BLDC_MOTOR_STATE_DC_OPERATION));
     }
     old_motor_mode[i] = bldc_motors[i].state & BLDC_MOTOR_STATE_DC_OPERATION;
+#endif
   }
 
   if(!(bldc_motors[0].status & BLDC_STATUS_MOVING_IN) && !(bldc_motors[0].status & BLDC_STATUS_MOVING_OUT) &&
@@ -776,11 +778,6 @@ void Flag_check() {
     bldc_Speed = 0;
 
 }
-
-uint32_t end_time;
-uint32_t s_time = 0;
-
-uint8_t cnt_print;
 
 void bldc_update_pwm(unsigned short value) {
   /* Set the pulse value for channel 1, 2, 3 */
@@ -1395,7 +1392,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 		}
 	}
 
-
+#if DEVICE == KVARK
 	if (!(bldc_motors[1].state & BLDC_MOTOR_STATE_DC_OPERATION))
 	{
 		if(GPIO_Pin == HALL_B1_Pin || GPIO_Pin == HALL_B2_Pin || GPIO_Pin == HALL_B3_Pin ){ //BLDC Motor 1
@@ -1404,7 +1401,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 			filter_n_samples = 6;
 		}
 	}
-
+#endif
 	speed_filter[motor] += speed_t - bldc_motors[motor].cnt_old;
 	if (speed_t  < bldc_motors[motor].cnt_old ){ //Timer overflow
 		speed_filter[motor] += htim16.Init.Period;
@@ -1440,16 +1437,12 @@ void set_external_INT(uint8_t motor, uint8_t state){
 		  GPIO_InitStruct.Pin = HALL_A2_Pin;
 		  HAL_GPIO_DeInit(HALL_A2_GPIO_Port, HALL_A2_Pin);
 		  HAL_GPIO_Init(HALL_A2_GPIO_Port, &GPIO_InitStruct);
-
+#if DEVICE == KVARK
 		  GPIO_InitStruct.Pin = HALL_A3_Pin;
 		  HAL_GPIO_DeInit(HALL_A3_GPIO_Port, HALL_A3_Pin);
 		  HAL_GPIO_Init(HALL_A3_GPIO_Port, &GPIO_InitStruct);
 	  }
 	  else if(motor == MOTOR_1){
-		  GPIO_InitStruct.Pin = HALL_B1_Pin;
-		  HAL_GPIO_DeInit(HALL_B1_GPIO_Port, HALL_B1_Pin);
-		  HAL_GPIO_Init(HALL_B1_GPIO_Port, &GPIO_InitStruct);
-
 		  GPIO_InitStruct.Pin = HALL_B2_Pin;
 		  HAL_GPIO_DeInit(HALL_B2_GPIO_Port, HALL_B2_Pin);
 		  HAL_GPIO_Init(HALL_B2_GPIO_Port, &GPIO_InitStruct);
@@ -1457,6 +1450,12 @@ void set_external_INT(uint8_t motor, uint8_t state){
 		  GPIO_InitStruct.Pin = HALL_B3_Pin;
 		  HAL_GPIO_DeInit(HALL_B3_GPIO_Port, HALL_B3_Pin);
 		  HAL_GPIO_Init(HALL_B3_GPIO_Port, &GPIO_InitStruct);
+#endif
+#if DEVICE != PICO
+		  GPIO_InitStruct.Pin = HALL_B1_Pin;
+		  HAL_GPIO_DeInit(HALL_B1_GPIO_Port, HALL_B1_Pin);
+		  HAL_GPIO_Init(HALL_B1_GPIO_Port, &GPIO_InitStruct);
+#endif
 	  }
 }
 

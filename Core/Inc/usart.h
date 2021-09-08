@@ -37,6 +37,9 @@ extern UART_HandleTypeDef huart2;
 extern UART_HandleTypeDef huart3;
 
 /* USER CODE BEGIN Private defines */
+extern UART_HandleTypeDef *huart485;
+extern DMA_HandleTypeDef *hdma_usart485_rx;
+extern DMA_HandleTypeDef *hdma_usart485_tx;
 
 #define RS485_ENABLED		0
 #define TX_INTERRUPT		1		/* 0 if TX uses polling, 1 interrupt driven. */

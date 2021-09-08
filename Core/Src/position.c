@@ -434,12 +434,16 @@ GPIO_PinState getHallState1(unsigned char index){
 	{
 	case 0:
 		return HAL_GPIO_ReadPin(HALL_A1_GPIO_Port, HALL_A1_Pin);
-	case 2:
-		return HAL_GPIO_ReadPin(HALL_A3_GPIO_Port, HALL_A3_Pin);
+#if DEVICE != PICO
 	case 1:
 		return HAL_GPIO_ReadPin(HALL_B1_GPIO_Port, HALL_B1_Pin);
+#endif
+#if DEVICE == KVARK
+	case 2:
+		return HAL_GPIO_ReadPin(HALL_A3_GPIO_Port, HALL_A3_Pin);
 	case 3:
 		return HAL_GPIO_ReadPin(HALL_B3_GPIO_Port, HALL_B3_Pin);
+#endif
 	default: return 0;
 	}
 }
@@ -449,12 +453,16 @@ GPIO_PinState getHallState2(unsigned char index){
 	{
 	case 0:
 		return HAL_GPIO_ReadPin(HALL_A2_GPIO_Port, HALL_A2_Pin);
-	case 2:
-		return HAL_GPIO_ReadPin(END_SW_A_LO_GPIO_Port, END_SW_A_LO_Pin);
+#if DEVICE != PICO
 	case 1:
 		return HAL_GPIO_ReadPin(HALL_B2_GPIO_Port, HALL_B2_Pin);
+#endif
+#if DEVICE == KVARK
+	case 2:
+		return HAL_GPIO_ReadPin(END_SW_A_LO_GPIO_Port, END_SW_A_LO_Pin);
 	case 3:
 		return HAL_GPIO_ReadPin(END_SW_B_LO_GPIO_Port, END_SW_B_LO_Pin);
+#endif
 	default: return 0;
 	}
 }

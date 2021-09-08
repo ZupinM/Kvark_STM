@@ -321,7 +321,6 @@ uint8_t LoRa_config(uint8_t channel, uint8_t power, uint8_t spFactor, uint8_t Lo
   uint8_t tmp[10];
 
   set_settings_flag = 0;
-  LoRa_Interrupt(DISABLE_INTERRUPTS);
 
   module.channel = channel;
   module.power = power;
@@ -405,8 +404,6 @@ uint8_t LoRa_config(uint8_t channel, uint8_t power, uint8_t spFactor, uint8_t Lo
   LoRa_SPIWrite(REG_LR_PADAC, tmp, 1);  //Tx for 20dBm on HP pin
 
   LoRa_standby(); //Entry standby mode
-
-  LoRa_Interrupt(ENABLE_INTERRUPTS);
 
   if(mode)
    LoRa_EntryTx(packetLength, 2000);

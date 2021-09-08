@@ -142,7 +142,7 @@ void HAL_SPI_MspInit(SPI_HandleTypeDef* spiHandle)
 
   /* USER CODE BEGIN SPI3_MspInit 1 */
 
-    HAL_GPIO_WritePin(Xbee_RESET_GPIO_Port, Xbee_RESET_Pin, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(LoRa_RESET_GPIO_Port, LoRa_RESET_Pin, GPIO_PIN_SET);
     HAL_GPIO_WritePin(LORA_NSS_GPIO_Port, LORA_NSS_Pin, GPIO_PIN_SET);
 
   /* USER CODE END SPI3_MspInit 1 */
@@ -233,9 +233,9 @@ void HAL_SPI_ErrorCallback(SPI_HandleTypeDef *hspi)
 
 
 void LoRa_reset(void) {
-  HAL_GPIO_WritePin(Xbee_RESET_GPIO_Port, Xbee_RESET_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(LoRa_RESET_GPIO_Port, LoRa_RESET_Pin, GPIO_PIN_RESET);
   HAL_Delay(2);
-  HAL_GPIO_WritePin(Xbee_RESET_GPIO_Port, Xbee_RESET_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(LoRa_RESET_GPIO_Port, LoRa_RESET_Pin, GPIO_PIN_SET);
   HAL_Delay(2);
 }
 

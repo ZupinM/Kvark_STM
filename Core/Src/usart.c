@@ -47,6 +47,10 @@ volatile uint8_t ModbusState1;
 volatile uint8_t ModbusState2;
 uint16_t flow_ctrl_hangup_timer = 0;
 unsigned char uartMode;
+
+UART_HandleTypeDef *huart485;
+DMA_HandleTypeDef *hdma_usart485_rx;
+DMA_HandleTypeDef *hdma_usart485_tx;
 /* USER CODE END 0 */
 
 UART_HandleTypeDef huart1;
@@ -84,15 +88,7 @@ void MX_USART1_UART_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN USART1_Init 2 */
-  if(HAL_UART_Receive_DMA(&huart1, (uint8_t *)UARTBuffer0, BUFSIZE) != HAL_OK) //Start receiving
-  {
-    Error_Handler();
-  }
-  __HAL_UART_DISABLE_IT(&huart1, UART_IT_PE);	//Disable Parity Error interrupt
-  __HAL_UART_DISABLE_IT(&huart1, UART_IT_FE);	//Disable Framing Error interrupt
-  __HAL_UART_DISABLE_IT(&huart1, UART_IT_ORE);	//Disable Overrun Error interrupt
-  __HAL_UART_DISABLE_IT(&huart1, UART_IT_ERR);
-  __HAL_UART_ENABLE_IT(&huart1, UART_IT_IDLE); //Enable UART Idle interrupt
+
   /* USER CODE END USART1_Init 2 */
 
 }
@@ -123,6 +119,16 @@ void MX_USART2_UART_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN USART2_Init 2 */
+
+#if DEVICE == KVARK
+  huart485 = &huart1;
+  hdma_usart485_rx = &hdma_usart1_rx;
+  hdma_usart485_tx = &hdma_usart1_tx;
+#else
+  huart485 = &huart2;
+  hdma_usart485_rx = &hdma_usart2_rx;
+  hdma_usart485_tx = &hdma_usart2_tx;
+#endif
 
   /* USER CODE END USART2_Init 2 */
 
@@ -163,11 +169,21 @@ void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle)
 {
 
   GPIO_InitTypeDef GPIO_InitStruct = {0};
+  RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
   if(uartHandle->Instance==USART1)
   {
   /* USER CODE BEGIN USART1_MspInit 0 */
 
   /* USER CODE END USART1_MspInit 0 */
+  /** Initializes the peripherals clock
+  */
+    PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USART1;
+    PeriphClkInit.Usart1ClockSelection = RCC_USART1CLKSOURCE_PCLK2;
+    if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
+    {
+      Error_Handler();
+    }
+
     /* USART1 clock enable */
     __HAL_RCC_USART1_CLK_ENABLE();
 
@@ -231,6 +247,16 @@ void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle)
   /* USER CODE BEGIN USART2_MspInit 0 */
 
   /* USER CODE END USART2_MspInit 0 */
+
+  /** Initializes the peripherals clock
+  */
+    PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USART2;
+    PeriphClkInit.Usart2ClockSelection = RCC_USART2CLKSOURCE_PCLK1;
+    if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
+    {
+      Error_Handler();
+    }
+
     /* USART2 clock enable */
     __HAL_RCC_USART2_CLK_ENABLE();
 
@@ -257,6 +283,16 @@ void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle)
   /* USER CODE BEGIN USART3_MspInit 0 */
 
   /* USER CODE END USART3_MspInit 0 */
+
+  /** Initializes the peripherals clock
+  */
+    PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USART3;
+    PeriphClkInit.Usart3ClockSelection = RCC_USART3CLKSOURCE_PCLK1;
+    if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
+    {
+      Error_Handler();
+    }
+
     /* USART3 clock enable */
     __HAL_RCC_USART3_CLK_ENABLE();
 
@@ -371,14 +407,14 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef *UartHandle)
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *UartHandle)
 {
 	volatile uint32_t tmp;                  	// volatile to prevent optimizations
-	tmp = huart1.Instance->ISR;                  // Read status register and data reg to clear RX flag
-	tmp = huart1.Instance->RDR;
+	tmp = huart485->Instance->ISR;                  // Read status register and data reg to clear RX flag
+	tmp = huart485->Instance->RDR;
 	(void) tmp;									// only to not have the compiler warning (variable not used)
 
-	UARTCount0 = BUFSIZE - __HAL_DMA_GET_COUNTER(&hdma_usart1_rx);
+	UARTCount0 = BUFSIZE - __HAL_DMA_GET_COUNTER(hdma_usart485_rx);
     ModbusState0 |= MODBUS_PACKET_RECIVED;
 
-    if(HAL_UART_DMAStop(&huart1) ) //Stop receiving
+    if(HAL_UART_DMAStop(huart485) ) //Stop receiving
     {
       Error_Handler();
     }
@@ -396,7 +432,7 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *UartHandle)
 
 void UARTSend(uint8_t *BufferPtr, uint32_t Length)
 {
-	  if(HAL_UART_Transmit_DMA(&huart1, (uint8_t*)BufferPtr, Length*2)!= HAL_OK) //Set length to double and treat HalfCplt interrupt as Transfer Complete
+	  if(HAL_UART_Transmit_DMA(huart485, (uint8_t*)BufferPtr, Length*2)!= HAL_OK) //Set length to double and treat HalfCplt interrupt as Transfer Complete
 	  {
 	    Error_Handler();
 	  }
@@ -464,12 +500,12 @@ void modbus_ReqProcessed()
 
 void reEnable_485_DMA_RX(void){
 
-	if (huart1.RxState == HAL_UART_STATE_READY && hdma_usart1_tx.State != HAL_DMA_STATE_BUSY){	//Reenable reception, when DMA is stoped in HAL_UART_RxCpltCallback
-	    if(HAL_UART_DMAStop(&huart1) ) //stop again to prevent errors
+	if (huart485->RxState == HAL_UART_STATE_READY && hdma_usart485_tx->State != HAL_DMA_STATE_BUSY){	//Reenable reception, when DMA is stoped in HAL_UART_RxCpltCallback
+	    if(HAL_UART_DMAStop(huart485) ) //stop again to prevent errors
 	    {
 	      Error_Handler();
 	    }
- 	    if(HAL_UART_Receive_DMA(&huart1, (uint8_t *)UARTBuffer0, BUFSIZE) != HAL_OK) 	//Start receiving
+ 	    if(HAL_UART_Receive_DMA(huart485, (uint8_t *)UARTBuffer0, BUFSIZE) != HAL_OK) 	//Start receiving
  	    {
  	      Error_Handler();
  	    }
@@ -478,14 +514,14 @@ void reEnable_485_DMA_RX(void){
 }
 
 void UART_ChangeBaudRate(int baud){
-	HAL_UART_DMAStop(&huart1);
-    HAL_UART_DeInit(&huart1);
-    huart1.Init.BaudRate = baud;
-    if (HAL_RS485Ex_Init(&huart1, UART_DE_POLARITY_HIGH, 0, 0) != HAL_OK)
+	HAL_UART_DMAStop(huart485);
+    HAL_UART_DeInit(huart485);
+    huart485->Init.BaudRate = baud;
+    if (HAL_RS485Ex_Init(huart485, UART_DE_POLARITY_HIGH, 0, 0) != HAL_OK)
     {
       Error_Handler();
     }
-	if(HAL_UART_Receive_DMA(&huart1, (uint8_t *)UARTBuffer0, BUFSIZE) != HAL_OK) 	//Start receiving
+	if(HAL_UART_Receive_DMA(huart485, (uint8_t *)UARTBuffer0, BUFSIZE) != HAL_OK) 	//Start receiving
 	{
 	  Error_Handler();
 	}

@@ -36,8 +36,11 @@ extern "C" {
 extern ADC_HandleTypeDef hadc1;
 
 /* USER CODE BEGIN Private defines */
-
+#if DEVICE == PICO
+#define ADC_BUFFER_LENGTH  8
+#else
 #define ADC_BUFFER_LENGTH  16
+#endif
 
 //Voltage measuring points
 #define HALL   0

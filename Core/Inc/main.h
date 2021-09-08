@@ -109,12 +109,13 @@ void bindMode_check();
 #define CHARGE_PUMP_PULSE 0
 #define MOTOR_PWM_PERIOD 0
 #define TIM1_PRESCALER 0
+#define DEVICE 5
 #define BT3_Pin GPIO_PIN_2
 #define BT3_GPIO_Port GPIOE
 #define CHARGE_PUMP_Pin GPIO_PIN_6
 #define CHARGE_PUMP_GPIO_Port GPIOE
-#define Xbee_RESET_Pin GPIO_PIN_13
-#define Xbee_RESET_GPIO_Port GPIOC
+#define LoRa_RESET_Pin GPIO_PIN_13
+#define LoRa_RESET_GPIO_Port GPIOC
 #define H_FOCUS_Pin GPIO_PIN_0
 #define H_FOCUS_GPIO_Port GPIOC
 #define V_FOCUS_Pin GPIO_PIN_1
@@ -222,7 +223,28 @@ void bindMode_check();
 
 #define KVARK 5
 #define XBEE2RS485 7
-#define DEVICE KVARK
+#define MICRO 8
+#define PICO  9
+//#define DEVICE KVARK
+
+#if DEVICE != KVARK
+#define MOTOR_B_1H_GPIO_Port MOTOR_A_1H_GPIO_Port
+#define MOTOR_B_2H_GPIO_Port MOTOR_A_2H_GPIO_Port
+#define MOTOR_B_3H_GPIO_Port MOTOR_A_3H_GPIO_Port
+#define MOTOR_B_1H_Pin MOTOR_A_1H_Pin
+#define MOTOR_B_2H_Pin MOTOR_A_2H_Pin
+#define MOTOR_B_3H_Pin MOTOR_A_3H_Pin
+#define MOTOR_B_1L_GPIO_Port MOTOR_A_1L_GPIO_Port
+#define MOTOR_B_2L_GPIO_Port MOTOR_A_2L_GPIO_Port
+#define MOTOR_B_3L_GPIO_Port MOTOR_A_3L_GPIO_Port
+#define MOTOR_B_1L_Pin MOTOR_A_1L_Pin
+#define MOTOR_B_2L_Pin MOTOR_A_2L_Pin
+#define MOTOR_B_3L_Pin MOTOR_A_3L_Pin
+#if DEVICE != PICO
+#define HALL_A3_Pin HALL_B1_Pin 	//BLDC option on MICRO
+#define HALL_A3_GPIO_Port HALL_B1_GPIO_Port
+#endif
+#endif
 
 #define MOTOR_1H_PORT(index) index ? MOTOR_B_1H_GPIO_Port : MOTOR_A_1H_GPIO_Port
 #define MOTOR_2H_PORT(index) index ? MOTOR_B_2H_GPIO_Port : MOTOR_A_2H_GPIO_Port
